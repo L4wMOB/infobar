@@ -1,10 +1,13 @@
-# InfoBar
+<p align="center">
+  <img src="screenshots/banner.png" alt="InfoBar" width="600">
+</p>
 
 A movable system overlay for iOS 15–18 (rootless jailbreaks such as Dopamine).
 It shows CPU, RAM, battery, network and system info on top of every app and can
 be fully configured in the Settings app (PreferenceLoader).
 
 ## Screenshots
+
 <details>
 <summary>Screenshots</summary>
 
