@@ -1,0 +1,9 @@
+Package: com.mathelord.infobar
+Name: InfoBar
+Version: 1.2.0
+Architecture: iphoneos-arm
+Description: Movable overlay showing CPU, RAM, battery, network and system info. Pin it in place, collapse it, and configure everything in Settings.
+Maintainer: mathelord
+Author: mathelord
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), preferenceloader, firmware (>= 15.0)
