@@ -35,7 +35,8 @@ jobs:
 
       - name: Read version
         id: ver
-        run: echo "version=$(sed -n 's/^Version: //p' control)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(sed -n 's/^Version: //p' control)" >> "$GITHUB_OUTPUT"
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
