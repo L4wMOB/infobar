@@ -27,11 +27,12 @@
 }
 
 - (void)resetAll {
-	UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Reset settings?"
-	                                                               message:@"All InfoBar settings will be restored to their defaults."
+	NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+	UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedStringFromTableInBundle(@"Reset settings?", @"Root", bundle, nil)
+	                                                               message:NSLocalizedStringFromTableInBundle(@"All InfoBar settings will be restored to their defaults.", @"Root", bundle, nil)
 	                                                        preferredStyle:UIAlertControllerStyleAlert];
-	[alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-	[alert addAction:[UIAlertAction actionWithTitle:@"Reset" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+	[alert addAction:[UIAlertAction actionWithTitle:NSLocalizedStringFromTableInBundle(@"Cancel", @"Root", bundle, nil) style:UIAlertActionStyleCancel handler:nil]];
+	[alert addAction:[UIAlertAction actionWithTitle:NSLocalizedStringFromTableInBundle(@"Reset", @"Root", bundle, nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
 		CFStringRef domain = CFSTR("com.mathelord.infobar");
 		CFArrayRef keys = CFPreferencesCopyKeyList(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 		if (keys) {

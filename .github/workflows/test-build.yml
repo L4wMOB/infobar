@@ -1,0 +1,35 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ldid make xz
+
+      - name: Set up Theos
+        run: |
+          git clone --depth 1 --recursive --shallow-submodules https://github.com/theos/theos.git "$HOME/theos"
+          # Patched SDK with private frameworks (Preferences.framework for the settings bundle)
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/theos/sdks.git "$RUNNER_TEMP/sdks"
+          git -C "$RUNNER_TEMP/sdks" sparse-checkout set iPhoneOS16.5.sdk
+          mkdir -p "$HOME/theos/sdks"
+          mv "$RUNNER_TEMP/sdks/iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Build rootless package
+        run: gmake package FINALPACKAGE=1
+
+      # Only an artifact, no release
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfoBar-rootless-test
+          path: packages/*.deb
