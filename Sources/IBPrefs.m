@@ -86,6 +86,10 @@ static UIColor *IBColorNamed(NSString *name) {
 		id color = IBValue(d, @"textColor");
 		_textColor = IBColorNamed([color isKindOfClass:[NSString class]] ? color : @"white");
 		_useFahrenheit = IBBool(d, @"useFahrenheit", NO);
+		_bgExtendTop = IBDouble(d, @"bgExtendTop", 0, 0, 40);
+		_bgExtendBottom = IBDouble(d, @"bgExtendBottom", 0, 0, 40);
+		_graphHeight = IBDouble(d, @"graphHeight", 22, 12, 60);
+		_graphWidth = IBDouble(d, @"graphWidth", 60, 30, 140);
 
 		_showTime = IBBool(d, @"showTime", NO);
 		_showCPU = IBBool(d, @"showCPU", YES);
@@ -105,6 +109,13 @@ static UIColor *IBColorNamed(NSString *name) {
 		_showStorage = IBBool(d, @"showStorage", NO);
 		_showUptime = IBBool(d, @"showUptime", NO);
 		_showThermal = IBBool(d, @"showThermal", NO);
+
+		_showCPUGraph = IBBool(d, @"showCPUGraph", NO);
+		_showRAMGraph = IBBool(d, @"showRAMGraph", NO);
+		_showChargeGraph = IBBool(d, @"showChargeGraph", NO);
+		_showTempGraph = IBBool(d, @"showTempGraph", NO);
+		_showCyclesGraph = IBBool(d, @"showCyclesGraph", NO);
+		_showNetworkGraph = IBBool(d, @"showNetworkGraph", NO);
 	}
 	return self;
 }
