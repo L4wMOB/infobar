@@ -62,9 +62,17 @@ static NSString *IBDuration(NSTimeInterval t) {
 @property (nonatomic, copy) NSArray<NSString *> *symbols; // first available SF Symbol is used
 @property (nonatomic, copy) NSString *label;              // short name when icons are off
 @property (nonatomic, strong) NSMutableAttributedString *value;
+@property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
+@property (nonatomic, copy) NSArray<UIColor *> *graphColors;
+@property (nonatomic) double graphMin;
+@property (nonatomic) double graphMax;
+@property (nonatomic) double graphMinSpan;
 @end
 
 @implementation IBItem
+@end
+
+@implementation IBModule
 @end
 
 @implementation IBFormatter
@@ -89,7 +97,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 	return nil;
 }
 
-+ (NSAttributedString *)textForStats:(IBStats *)s prefs:(IBPrefs *)p {
++ (NSArray<IBModule *> *)modulesForStats:(IBStats *)s prefs:(IBPrefs *)p {
 	UIFont *font = [UIFont monospacedDigitSystemFontOfSize:p.fontSize weight:UIFontWeightSemibold];
 	UIFont *smallFont = [UIFont monospacedDigitSystemFontOfSize:MAX(6, p.fontSize - 2) weight:UIFontWeightMedium];
 	UIColor *base = p.textColor;
@@ -97,7 +105,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 	BOOL list = p.layout == IBLayoutList && !collapsed;
 	NSMutableArray<IBItem *> *items = [NSMutableArray array];
 
-	if (collapsed && p.collapsedMode == IBCollapsedModeButtons) return [NSAttributedString new];
+	if (collapsed && p.collapsedMode == IBCollapsedModeButtons) return @[];
 
 	IBItem * (^add)(NSArray *, NSString *) = ^IBItem *(NSArray *symbols, NSString *label) {
 		IBItem *item = [IBItem new];
@@ -113,6 +121,18 @@ static NSString *IBDuration(NSTimeInterval t) {
 	};
 	void (^appendSmall)(IBItem *, NSString *) = ^(IBItem *item, NSString *text) {
 		[item.value appendAttributedString:[[NSAttributedString alloc] initWithString:text attributes:@{NSFontAttributeName: smallFont, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.75]}]];
+	};
+
+	// Attaches a realtime graph to an item. Colors follow the "color-coded" setting.
+	UIColor *(^graphColor)(CGFloat, CGFloat, CGFloat) = ^UIColor *(CGFloat r, CGFloat g, CGFloat b) {
+		return p.colorizeValues ? [UIColor colorWithRed:r green:g blue:b alpha:1] : base;
+	};
+	void (^attachGraph)(IBItem *, NSArray *, NSArray *, double, double, double) = ^(IBItem *item, NSArray *series, NSArray *colors, double min, double max, double minSpan) {
+		item.graphSeries = series;
+		item.graphColors = colors;
+		item.graphMin = min;
+		item.graphMax = max;
+		item.graphMinSpan = minSpan;
 	};
 
 	if (collapsed) {
@@ -164,11 +184,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 			append(add(@[@"clock"], @""), [df stringFromDate:[NSDate date]], IBLevelNone);
 		}
 
-		if (p.showCPU || p.showCPUFreq) {
+		if (p.showCPU || p.showCPUFreq || p.showCPUGraph) {
 			IBItem *it = add(@[@"cpu"], @"CPU");
-			if (p.showCPU) append(it, s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
+			// A graph on its own still shows the current percentage
+			BOOL cpuPercent = p.showCPU || !p.showCPUFreq;
+			if (cpuPercent) append(it, s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
+			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[graphColor(0.35, 0.85, 1.0)], 0, 100, 100);
 			if (p.showCPUFreq) {
-				if (p.showCPU) append(it, @" ", IBLevelNone);
+				if (cpuPercent) append(it, @" ", IBLevelNone);
 				NSString *approx = s.cpuFreqEstimated ? @"~" : @"";
 				if (list && s.cpuFreqEMHz > 0 && s.cpuFreqPMHz > 0) {
 					append(it, [NSString stringWithFormat:@"P %@ · E %@ GHz", IBGHz(s.cpuFreqPMHz), IBGHz(s.cpuFreqEMHz)], IBLevelNone);
@@ -188,16 +211,18 @@ static NSString *IBDuration(NSTimeInterval t) {
 			append(it, [NSString stringWithFormat:@"%@ · %@", s.chipName, cores], IBLevelNone);
 		}
 
-		if (p.showRAMPercent || p.showRAMGB) {
+		if (p.showRAMPercent || p.showRAMGB || p.showRAMGraph) {
 			IBItem *it = add(@[@"memorychip"], @"RAM");
-			if (p.showRAMPercent) append(it, s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
+			BOOL ramPercent = p.showRAMPercent || !p.showRAMGB;
+			if (ramPercent) append(it, s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
+			if (p.showRAMGraph) attachGraph(it, @[[s historyForSeries:IBSeriesRAM]], @[graphColor(0.72, 0.55, 1.0)], 0, 100, 100);
 			if (p.showRAMGB) {
-				if (p.showRAMPercent) append(it, @" ", IBLevelNone);
+				if (ramPercent) append(it, @" ", IBLevelNone);
 				append(it, [NSString stringWithFormat:@"%.1f/%.1f GB", s.ramUsed / 1073741824.0, s.ramTotal / 1073741824.0], IBLevelNone);
 			}
 		}
 
-		if (p.showBattery) {
+		if (p.showBattery || p.showChargeGraph) {
 			NSString *sym;
 			double pct = s.batteryPercent;
 			if (s.batteryCharging) sym = @"battery.100.bolt";
@@ -208,15 +233,17 @@ static NSString *IBDuration(NSTimeInterval t) {
 			else sym = @"battery.0";
 			IBItem *it = add(@[sym, @"battery.100"], @"BAT");
 			append(it, pct >= 0 ? [NSString stringWithFormat:@"%.0f%%", pct] : @"–", IBLevelDescending(pct, 40, 20));
+			if (p.showChargeGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCharge]], @[graphColor(0.35, 0.90, 0.45)], 0, 100, 100);
 			if (list && s.batteryMaxCapacity > 0 && pct >= 0)
 				appendSmall(it, [NSString stringWithFormat:@"  ~%.0f mAh", s.batteryMaxCapacity * pct / 100.0]);
 		}
 
-		if (p.showBatteryTemp && s.batteryTemperature > -100) {
+		if ((p.showBatteryTemp || p.showTempGraph) && s.batteryTemperature > -100) {
 			IBItem *it = add(@[@"thermometer.medium", @"thermometer"], @"TMP");
 			double t = s.batteryTemperature;
 			NSString *text = p.useFahrenheit ? [NSString stringWithFormat:@"%.1f°F", t * 9.0 / 5.0 + 32.0] : [NSString stringWithFormat:@"%.1f°C", t];
 			append(it, text, IBLevelAscending(t, 36, 42));
+			if (p.showTempGraph) attachGraph(it, @[[s historyForSeries:IBSeriesTemp]], @[graphColor(1.0, 0.62, 0.20)], NAN, NAN, 4);
 		}
 
 		if (p.showBatteryPower && s.batteryVoltage > 0) {
@@ -243,13 +270,17 @@ static NSString *IBDuration(NSTimeInterval t) {
 				appendSmall(it, [NSString stringWithFormat:@"  %ld/%ld mAh", (long)s.batteryMaxCapacity, (long)s.batteryDesignCapacity]);
 		}
 
-		if (p.showBatteryCycles && s.batteryCycles >= 0) {
-			append(add(@[@"arrow.triangle.2.circlepath"], @"CYC"), [NSString stringWithFormat:@"%ld%@", (long)s.batteryCycles, list ? @" cycles" : @""], IBLevelNone);
+		if ((p.showBatteryCycles || p.showCyclesGraph) && s.batteryCycles >= 0) {
+			IBItem *it = add(@[@"arrow.triangle.2.circlepath"], @"CYC");
+			append(it, [NSString stringWithFormat:@"%ld%@", (long)s.batteryCycles, list ? @" cycles" : @""], IBLevelNone);
+			if (p.showCyclesGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCycles]], @[graphColor(1.0, 0.45, 0.75)], NAN, NAN, 2);
 		}
 
-		if (p.showNetwork) {
+		if (p.showNetwork || p.showNetworkGraph) {
 			IBItem *it = add(@[@"arrow.up.arrow.down"], @"NET");
 			append(it, [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
+			UIColor *upColor = p.colorizeValues ? [UIColor colorWithRed:1.0 green:0.62 blue:0.20 alpha:1] : [base colorWithAlphaComponent:0.55];
+			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[graphColor(0.35, 0.85, 1.0), upColor], 0, NAN, 10240);
 		}
 
 		if (p.showIP) {
@@ -276,12 +307,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 	}
 
 	// Assemble
-	NSMutableAttributedString *out = [NSMutableAttributedString new];
+	NSMutableArray<IBModule *> *modules = [NSMutableArray array];
 	NSDictionary *labelAttrs = @{NSFontAttributeName: font, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.85]};
-	NSAttributedString *separator = [[NSAttributedString alloc] initWithString:(list ? @"\n" : @"   ") attributes:labelAttrs];
+	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
+	// If a module doesn't fit on screen, wrap inside it
+	para.lineBreakMode = NSLineBreakByWordWrapping;
 
 	for (IBItem *item in items) {
-		if (out.length > 0) [out appendAttributedString:separator];
+		NSMutableAttributedString *line = [NSMutableAttributedString new];
 		UIImage *icon = p.useIcons ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base] : nil;
 		if (icon) {
 			NSTextAttachment *att = [NSTextAttachment new];
@@ -289,25 +322,36 @@ static NSString *IBDuration(NSTimeInterval t) {
 			// Vertically center the symbol on the cap height
 			CGSize size = icon.size;
 			att.bounds = CGRectMake(0, round((font.capHeight - size.height) / 2.0), size.width, size.height);
-			[out appendAttributedString:[NSAttributedString attributedStringWithAttachment:att]];
-			[out appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u00A0" attributes:labelAttrs]];
+			[line appendAttributedString:[NSAttributedString attributedStringWithAttachment:att]];
+			[line appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u00A0" attributes:labelAttrs]];
 		} else if (item.label.length > 0) {
-			[out appendAttributedString:[[NSAttributedString alloc] initWithString:[item.label stringByAppendingString:@"\u00A0"] attributes:labelAttrs]];
+			[line appendAttributedString:[[NSAttributedString alloc] initWithString:[item.label stringByAppendingString:@"\u00A0"] attributes:labelAttrs]];
 		}
 		// Never wrap inside a module, only between modules
 		[item.value.mutableString replaceOccurrencesOfString:@" " withString:@"\u00A0" options:0 range:NSMakeRange(0, item.value.length)];
-		[out appendAttributedString:item.value];
+		[line appendAttributedString:item.value];
+		[line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
+
+		IBModule *m = [IBModule new];
+		m.text = line;
+		m.graphSeries = item.graphSeries ?: @[];
+		m.graphColors = item.graphColors ?: @[];
+		m.graphMin = item.graphSeries ? item.graphMin : NAN;
+		m.graphMax = item.graphSeries ? item.graphMax : NAN;
+		m.graphMinSpan = item.graphMinSpan;
+		[modules addObject:m];
 	}
 
-	if (out.length == 0)
-		[out appendAttributedString:[[NSAttributedString alloc] initWithString:@"InfoBar" attributes:labelAttrs]];
-
-	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
-	para.lineSpacing = list ? 2 : 0;
-	// If the row doesn't fit on screen, wrap between modules
-	para.lineBreakMode = NSLineBreakByWordWrapping;
-	[out addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, out.length)];
-	return out;
+	if (modules.count == 0) {
+		IBModule *m = [IBModule new];
+		m.text = [[NSAttributedString alloc] initWithString:@"InfoBar" attributes:labelAttrs];
+		m.graphSeries = @[];
+		m.graphColors = @[];
+		m.graphMin = NAN;
+		m.graphMax = NAN;
+		[modules addObject:m];
+	}
+	return modules;
 }
 
 @end
