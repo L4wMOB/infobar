@@ -202,6 +202,9 @@ static double IBEstimateCurrentCoreMHz(void) {
 	// Storage (refreshed rarely)
 	uint64_t _lastStorageTime;
 	uint64_t _lastIPTime;
+	// Graph history
+	NSMutableArray<NSMutableArray<NSNumber *> *> *_history;
+	uint64_t _lastHistoryTime;
 }
 
 + (instancetype)sharedInstance {
@@ -224,6 +227,9 @@ static double IBEstimateCurrentCoreMHz(void) {
 		_batteryCycles = -1;
 		_netDownBytesPerSec = -1;
 		_netUpBytesPerSec = -1;
+
+		_history = [NSMutableArray array];
+		for (NSInteger i = 0; i < IBSeriesCount; i++) [_history addObject:[NSMutableArray arrayWithCapacity:IB_HISTORY_COUNT + 1]];
 
 		_cpuCoreCount = [NSProcessInfo processInfo].activeProcessorCount;
 		if (IBSysctlInt("hw.nperflevels", 0) >= 2) {
@@ -258,7 +264,37 @@ static double IBEstimateCurrentCoreMHz(void) {
 		[self refreshBattery];
 		[self refreshNetwork];
 		[self refreshSystem];
+		[self recordHistory];
 	}
+}
+
+#pragma mark History
+
+- (void)recordHistory {
+	uint64_t now = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+	// Extra refreshes (settings changed, collapse, ...) must not add uneven samples
+	if (_lastHistoryTime > 0 && now - _lastHistoryTime < 300 * NSEC_PER_MSEC) return;
+	_lastHistoryTime = now;
+
+	void (^push)(IBSeries, double) = ^(IBSeries series, double v) {
+		NSMutableArray<NSNumber *> *a = self->_history[series];
+		[a addObject:@(v)];
+		if (a.count > IB_HISTORY_COUNT) [a removeObjectsInRange:NSMakeRange(0, a.count - IB_HISTORY_COUNT)];
+	};
+	if (_cpuUsage >= 0) push(IBSeriesCPU, _cpuUsage);
+	if (_ramUsagePercent >= 0) push(IBSeriesRAM, _ramUsagePercent);
+	if (_batteryPercent >= 0) push(IBSeriesCharge, _batteryPercent);
+	if (_batteryTemperature > -100) push(IBSeriesTemp, _batteryTemperature);
+	if (_batteryCycles >= 0) push(IBSeriesCycles, (double)_batteryCycles);
+	if (_netDownBytesPerSec >= 0 && _netUpBytesPerSec >= 0) {
+		push(IBSeriesNetDown, _netDownBytesPerSec);
+		push(IBSeriesNetUp, _netUpBytesPerSec);
+	}
+}
+
+- (NSArray<NSNumber *> *)historyForSeries:(IBSeries)series {
+	if (series < 0 || series >= IBSeriesCount) return @[];
+	return [_history[series] copy];
 }
 
 #pragma mark CPU
