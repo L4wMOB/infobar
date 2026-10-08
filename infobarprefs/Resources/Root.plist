@@ -164,7 +164,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow.</string>
+			<string>Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow.</string>
 			<key>label</key>
 			<string>When collapsed, show</string>
 		</dict>
@@ -189,6 +189,132 @@
 				<integer>0</integer>
 				<integer>1</integer>
 			</array>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowTime</string>
+			<key>label</key>
+			<string>Time</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowCPU</string>
+			<key>label</key>
+			<string>CPU</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowRAM</string>
+			<key>label</key>
+			<string>Memory (RAM)</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowBattery</string>
+			<key>label</key>
+			<string>Battery</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowTemp</string>
+			<key>label</key>
+			<string>Temperature</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowNetwork</string>
+			<key>label</key>
+			<string>Network</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowStorage</string>
+			<key>label</key>
+			<string>Free storage</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowUptime</string>
+			<key>label</key>
+			<string>Uptime since reboot</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>collapsedShowThermal</string>
+			<key>label</key>
+			<string>Thermal state</string>
 		</dict>
 		<dict>
 			<key>cell</key>

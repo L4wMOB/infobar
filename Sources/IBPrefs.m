@@ -64,6 +64,15 @@ static UIColor *IBColorNamed(NSString *name) {
 		_collapsed = IBBool(d, @"collapsed", NO);
 		_showCollapseButton = IBBool(d, @"showCollapseButton", YES);
 		_collapsedMode = (IBCollapsedMode)IBDouble(d, @"collapsedMode", IBCollapsedModeSummary, 0, 1);
+		_collapsedShowTime = IBBool(d, @"collapsedShowTime", NO);
+		_collapsedShowCPU = IBBool(d, @"collapsedShowCPU", YES);
+		_collapsedShowRAM = IBBool(d, @"collapsedShowRAM", YES);
+		_collapsedShowBattery = IBBool(d, @"collapsedShowBattery", YES);
+		_collapsedShowTemp = IBBool(d, @"collapsedShowTemp", NO);
+		_collapsedShowNetwork = IBBool(d, @"collapsedShowNetwork", NO);
+		_collapsedShowStorage = IBBool(d, @"collapsedShowStorage", NO);
+		_collapsedShowUptime = IBBool(d, @"collapsedShowUptime", NO);
+		_collapsedShowThermal = IBBool(d, @"collapsedShowThermal", NO);
 		_updateInterval = IBDouble(d, @"updateInterval", 1.0, 0.5, 10.0);
 		_position = CGPointMake(IBDouble(d, @"posX", -1, -1, 1), IBDouble(d, @"posY", -1, -1, 1));
 

@@ -31,6 +31,16 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) BOOL collapsed;
 @property (nonatomic, readonly) BOOL showCollapseButton;
 @property (nonatomic, readonly) IBCollapsedMode collapsedMode;
+// Values in the collapsed summary (max 4, in this order)
+@property (nonatomic, readonly) BOOL collapsedShowTime;
+@property (nonatomic, readonly) BOOL collapsedShowCPU;
+@property (nonatomic, readonly) BOOL collapsedShowRAM;
+@property (nonatomic, readonly) BOOL collapsedShowBattery;
+@property (nonatomic, readonly) BOOL collapsedShowTemp;
+@property (nonatomic, readonly) BOOL collapsedShowNetwork;
+@property (nonatomic, readonly) BOOL collapsedShowStorage;
+@property (nonatomic, readonly) BOOL collapsedShowUptime;
+@property (nonatomic, readonly) BOOL collapsedShowThermal;
 @property (nonatomic, readonly) double updateInterval;
 @property (nonatomic, readonly) CGPoint position; // relative (0..1), {-1,-1} = default
 

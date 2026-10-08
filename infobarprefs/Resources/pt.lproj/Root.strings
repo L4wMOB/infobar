@@ -13,7 +13,7 @@
 "Row" = "Linha";
 "List" = "Lista";
 "When collapsed, show" = "Ao recolher, mostrar";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "O resumo mostra CPU, RAM e bateria em %. «Só botões» mantém apenas o pin e a seta.";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "O resumo mostra até 4 dos valores escolhidos abaixo, nesta ordem. “Só botões” mantém apenas o alfinete e a seta.";
 "Summary" = "Resumo";
 "Buttons only" = "Só botões";
 "Update interval (seconds)" = "Intervalo de atualização (segundos)";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "Todas as definições do InfoBar serão repostas para os valores predefinidos.";
 "Cancel" = "Cancelar";
 "Reset" = "Repor";
+"Maximum 4 values" = "Máximo de 4 valores";
+"Turn off another value first." = "Desative outro valor primeiro.";

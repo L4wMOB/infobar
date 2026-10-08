@@ -13,7 +13,7 @@
 "Row" = "Satır";
 "List" = "Liste";
 "When collapsed, show" = "Daraltıldığında göster";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "Özet; CPU, RAM ve pili % olarak gösterir. “Yalnızca düğmeler” sadece iğneyi ve oku bırakır.";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Özet, aşağıda seçilen değerlerden en fazla 4 tanesini bu sırayla gösterir. “Yalnızca düğmeler” yalnızca raptiye ve oku bırakır.";
 "Summary" = "Özet";
 "Buttons only" = "Yalnızca düğmeler";
 "Update interval (seconds)" = "Güncelleme aralığı (saniye)";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "Tüm InfoBar ayarları varsayılan değerlerine döndürülecek.";
 "Cancel" = "İptal";
 "Reset" = "Sıfırla";
+"Maximum 4 values" = "En fazla 4 değer";
+"Turn off another value first." = "Önce başka bir değeri kapatın.";

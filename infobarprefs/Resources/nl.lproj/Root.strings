@@ -13,7 +13,7 @@
 "Row" = "Rij";
 "List" = "Lijst";
 "When collapsed, show" = "Toon wanneer ingeklapt";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "De samenvatting toont cpu, RAM en batterij in %. ‘Alleen knoppen’ behoudt alleen de pin en de pijl.";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "De samenvatting toont maximaal 4 van de hieronder gekozen waarden, in deze volgorde. ‘Alleen knoppen’ houdt alleen de pin en de pijl.";
 "Summary" = "Samenvatting";
 "Buttons only" = "Alleen knoppen";
 "Update interval (seconds)" = "Verversingsinterval (seconden)";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "Alle InfoBar-instellingen worden teruggezet naar de standaardwaarden.";
 "Cancel" = "Annuleer";
 "Reset" = "Reset";
+"Maximum 4 values" = "Maximaal 4 waarden";
+"Turn off another value first." = "Zet eerst een andere waarde uit.";

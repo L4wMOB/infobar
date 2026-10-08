@@ -13,7 +13,7 @@
 "Row" = "Строка";
 "List" = "Список";
 "When collapsed, show" = "В свёрнутом виде показывать";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "Сводка показывает ЦП, ОЗУ и батарею в %. «Только кнопки» оставляет лишь булавку и стрелку.";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Сводка показывает до 4 выбранных ниже значений в этом порядке. «Только кнопки» оставляет лишь булавку и стрелку.";
 "Summary" = "Сводка";
 "Buttons only" = "Только кнопки";
 "Update interval (seconds)" = "Интервал обновления (секунды)";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "Все настройки InfoBar будут сброшены к значениям по умолчанию.";
 "Cancel" = "Отмена";
 "Reset" = "Сбросить";
+"Maximum 4 values" = "Не больше 4 значений";
+"Turn off another value first." = "Сначала отключите другое значение.";

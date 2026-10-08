@@ -116,11 +116,44 @@ static NSString *IBDuration(NSTimeInterval t) {
 	};
 
 	if (collapsed) {
-		// Summary: CPU, RAM and battery in %
-		append(add(@[@"cpu"], @"CPU"), s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
-		append(add(@[@"memorychip"], @"RAM"), s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
-		double pct = s.batteryPercent;
-		append(add(@[s.batteryCharging ? @"battery.100.bolt" : @"battery.75", @"battery.100"], @"BAT"), pct >= 0 ? [NSString stringWithFormat:@"%.0f%%", pct] : @"–", IBLevelDescending(pct, 40, 20));
+		// Summary: up to 4 selected values, in the same order as the settings
+		NSUInteger maxItems = 4;
+		if (p.collapsedShowTime && items.count < maxItems) {
+			static NSDateFormatter *cdf;
+			static dispatch_once_t conce;
+			dispatch_once(&conce, ^{
+				cdf = [NSDateFormatter new];
+				cdf.dateFormat = @"HH:mm";
+			});
+			append(add(@[@"clock"], @""), [cdf stringFromDate:[NSDate date]], IBLevelNone);
+		}
+		if (p.collapsedShowCPU && items.count < maxItems)
+			append(add(@[@"cpu"], @"CPU"), s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
+		if (p.collapsedShowRAM && items.count < maxItems)
+			append(add(@[@"memorychip"], @"RAM"), s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
+		if (p.collapsedShowBattery && items.count < maxItems) {
+			double pct = s.batteryPercent;
+			append(add(@[s.batteryCharging ? @"battery.100.bolt" : @"battery.75", @"battery.100"], @"BAT"), pct >= 0 ? [NSString stringWithFormat:@"%.0f%%", pct] : @"–", IBLevelDescending(pct, 40, 20));
+		}
+		if (p.collapsedShowTemp && items.count < maxItems && s.batteryTemperature > -100) {
+			double t = s.batteryTemperature;
+			NSString *text = p.useFahrenheit ? [NSString stringWithFormat:@"%.0f°F", t * 9.0 / 5.0 + 32.0] : [NSString stringWithFormat:@"%.0f°C", t];
+			append(add(@[@"thermometer.medium", @"thermometer"], @"TMP"), text, IBLevelAscending(t, 36, 42));
+		}
+		if (p.collapsedShowNetwork && items.count < maxItems)
+			append(add(@[@"arrow.up.arrow.down"], @"NET"), [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
+		if (p.collapsedShowStorage && items.count < maxItems && s.storageTotal > 0) {
+			double freePct = (double)s.storageFree * 100.0 / (double)s.storageTotal;
+			append(add(@[@"internaldrive"], @"SSD"), IBBytes(s.storageFree, 0), IBLevelDescending(freePct, 15, 5));
+		}
+		if (p.collapsedShowUptime && items.count < maxItems && s.uptime > 0)
+			append(add(@[@"timer", @"clock.arrow.circlepath"], @"UP"), IBDuration(s.uptime), IBLevelNone);
+		if (p.collapsedShowThermal && items.count < maxItems) {
+			NSString *names[] = {@"Nominal", @"Fair", @"Serious", @"Critical"};
+			IBLevel levels[] = {IBLevelGood, IBLevelWarn, IBLevelHigh, IBLevelCritical};
+			NSInteger st = MIN(MAX((NSInteger)s.thermalState, 0), 3);
+			append(add(@[@"flame.fill", @"flame"], @"THR"), names[st], levels[st]);
+		}
 	} else {
 		if (p.showTime) {
 			static NSDateFormatter *df;

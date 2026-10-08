@@ -13,7 +13,7 @@
 "Row" = "Row";
 "List" = "List";
 "When collapsed, show" = "When collapsed, show";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow.";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow.";
 "Summary" = "Summary";
 "Buttons only" = "Buttons only";
 "Update interval (seconds)" = "Update interval (seconds)";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "All InfoBar settings will be restored to their defaults.";
 "Cancel" = "Cancel";
 "Reset" = "Reset";
+"Maximum 4 values" = "Maximum 4 values";
+"Turn off another value first." = "Turn off another value first.";

@@ -13,7 +13,7 @@
 "Row" = "横並び";
 "List" = "リスト";
 "When collapsed, show" = "折りたたみ時の表示";
-"Summary shows CPU, RAM and battery in %. “Buttons only” keeps just the pin and the arrow." = "サマリーにはCPU、RAM、バッテリーを%で表示します。「ボタンのみ」ではピンと矢印だけを残します。";
+"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "サマリーには下で選んだ値が最大4つ、この順番で表示されます。「ボタンのみ」はピンと矢印だけを残します。";
 "Summary" = "サマリー";
 "Buttons only" = "ボタンのみ";
 "Update interval (seconds)" = "更新間隔（秒）";
@@ -66,3 +66,5 @@
 "All InfoBar settings will be restored to their defaults." = "InfoBarのすべての設定が初期値に戻ります。";
 "Cancel" = "キャンセル";
 "Reset" = "リセット";
+"Maximum 4 values" = "最大4項目";
+"Turn off another value first." = "先に別の項目をオフにしてください。";
