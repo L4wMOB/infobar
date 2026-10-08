@@ -2,6 +2,20 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// Number of samples kept per graph (one sample per update interval)
+#define IB_HISTORY_COUNT 60
+
+typedef NS_ENUM(NSInteger, IBSeries) {
+	IBSeriesCPU,
+	IBSeriesRAM,
+	IBSeriesCharge,
+	IBSeriesTemp,
+	IBSeriesCycles,
+	IBSeriesNetDown,
+	IBSeriesNetUp,
+	IBSeriesCount,
+};
+
 // Collects all system values. -refresh must be called periodically (off the main
 // thread); rates (CPU, network) are computed from the delta to the previous
 // call. Unknown values are negative.
@@ -9,6 +23,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedInstance;
 - (void)refresh;
+
+// Recent samples (oldest first) for the graphs. Call on the same queue as -refresh.
+- (NSArray<NSNumber *> *)historyForSeries:(IBSeries)series;
 
 // Only measure the clock when it's shown (estimation costs some CPU time)
 @property (nonatomic) BOOL measureCPUFrequency;
