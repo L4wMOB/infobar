@@ -54,6 +54,10 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) double cornerRadius;
 @property (nonatomic, readonly, strong) UIColor *textColor;
 @property (nonatomic, readonly) BOOL useFahrenheit;
+@property (nonatomic, readonly) double bgExtendTop;
+@property (nonatomic, readonly) double bgExtendBottom;
+@property (nonatomic, readonly) double graphHeight;
+@property (nonatomic, readonly) double graphWidth;
 
 // Modules
 @property (nonatomic, readonly) BOOL showTime;
@@ -74,6 +78,14 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) BOOL showStorage;
 @property (nonatomic, readonly) BOOL showUptime;
 @property (nonatomic, readonly) BOOL showThermal;
+
+// Realtime graphs
+@property (nonatomic, readonly) BOOL showCPUGraph;
+@property (nonatomic, readonly) BOOL showRAMGraph;
+@property (nonatomic, readonly) BOOL showChargeGraph;
+@property (nonatomic, readonly) BOOL showTempGraph;
+@property (nonatomic, readonly) BOOL showCyclesGraph;
+@property (nonatomic, readonly) BOOL showNetworkGraph;
 
 // Writes from the overlay (pin, position, layout)
 + (void)setValue:(nullable id)value forKey:(NSString *)key;
