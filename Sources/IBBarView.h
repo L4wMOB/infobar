@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@class IBBarView, IBPrefs;
+@class IBBarView, IBPrefs, IBModule;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -16,8 +16,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, getter=isPinned) BOOL pinned;
 @property (nonatomic, readonly, getter=isDragging) BOOL dragging;
 - (void)applyPrefs:(IBPrefs *)prefs;
-- (void)setText:(NSAttributedString *)text;
-// Size for the current text (within the maximum width)
+- (void)setModules:(NSArray<IBModule *> *)modules;
+// Size for the current content (within the maximum width)
 - (CGSize)preferredSizeForMaxWidth:(CGFloat)maxWidth;
 @end
 
