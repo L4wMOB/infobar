@@ -1,14 +1,49 @@
 #import "IBBarView.h"
 #import "IBPrefs.h"
+#import "IBFormatter.h"
+#import "IBGraphView.h"
 
 static const CGFloat kPadH = 8;
 static const CGFloat kPadV = 5;
 static const CGFloat kPinSize = 20;
+static const CGFloat kCellGapH = 12;
+static const CGFloat kLineGapRow = 4;
+static const CGFloat kLineGapList = 3;
+static const CGFloat kGraphGapBelow = 2;
+static const CGFloat kGraphGapSide = 6;
+static const CGFloat kMinGraphWidth = 44;
+
+#pragma mark - Cell (one module: text + optional graph)
+
+@interface IBCellView : UIView
+@property (nonatomic, readonly) UILabel *label;
+@property (nonatomic, readonly) IBGraphView *graph;
+@end
+
+@implementation IBCellView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+	if ((self = [super initWithFrame:frame])) {
+		self.userInteractionEnabled = NO;
+		_label = [UILabel new];
+		_label.numberOfLines = 0;
+		_label.lineBreakMode = NSLineBreakByWordWrapping;
+		_label.userInteractionEnabled = NO;
+		[self addSubview:_label];
+		_graph = [IBGraphView new];
+		_graph.hidden = YES;
+		[self addSubview:_graph];
+	}
+	return self;
+}
+
+@end
+
+#pragma mark - Bar
 
 @implementation IBBarView {
 	UIVisualEffectView *_blurView;
 	UIView *_tintView;
-	UILabel *_label;
 	UIButton *_pinButton;
 	UIButton *_collapseButton;
 	UIPanGestureRecognizer *_pan;
@@ -18,12 +53,29 @@ static const CGFloat kPinSize = 20;
 	BOOL _showCollapse;
 	BOOL _collapsed;
 	CGPoint _panStartCenter;
+	// Content
+	NSArray<IBModule *> *_modules;
+	NSMutableArray<IBCellView *> *_cells;
+	CGFloat _graphHeight, _graphWidth;
+	CGFloat _extraTop, _extraBottom;
+	// Cached layout (relative to the bar), see -computeLayoutForMaxWidth:
+	NSMutableArray<NSValue *> *_cellFrames;
+	NSMutableArray<NSValue *> *_labelFrames;
+	NSMutableArray<NSValue *> *_graphFrames;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
 		self.clipsToBounds = YES;
 		self.layer.cornerCurve = kCACornerCurveContinuous;
+
+		_cells = [NSMutableArray array];
+		_modules = @[];
+		_cellFrames = [NSMutableArray array];
+		_labelFrames = [NSMutableArray array];
+		_graphFrames = [NSMutableArray array];
+		_graphHeight = 22;
+		_graphWidth = 60;
 
 		_blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
 		_blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -35,12 +87,6 @@ static const CGFloat kPinSize = 20;
 		_tintView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		_tintView.userInteractionEnabled = NO;
 		[self addSubview:_tintView];
-
-		_label = [UILabel new];
-		_label.numberOfLines = 0;
-		_label.lineBreakMode = NSLineBreakByWordWrapping;
-		_label.userInteractionEnabled = NO;
-		[self addSubview:_label];
 
 		_pinButton = [UIButton buttonWithType:UIButtonTypeCustom];
 		[_pinButton addTarget:self action:@selector(pinTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -82,6 +128,11 @@ static const CGFloat kPinSize = 20;
 	[self updateCollapseAppearance];
 	_doubleTap.enabled = prefs.doubleTapTogglesLayout;
 
+	_graphHeight = prefs.graphHeight;
+	_graphWidth = prefs.graphWidth;
+	_extraTop = prefs.bgExtendTop;
+	_extraBottom = prefs.bgExtendBottom;
+
 	BOOL blur = prefs.useBlur && prefs.backgroundAlpha > 0.02;
 	_blurView.hidden = !blur;
 	// With blur, a lighter tint gives the same perceived opacity
@@ -114,10 +165,35 @@ static const CGFloat kPinSize = 20;
 	_collapseButton.accessibilityLabel = _collapsed ? @"Expand InfoBar" : @"Collapse InfoBar";
 }
 
-#pragma mark Content & layout
+#pragma mark Content
 
-- (void)setText:(NSAttributedString *)text {
-	_label.attributedText = text;
+- (void)setModules:(NSArray<IBModule *> *)modules {
+	_modules = [modules copy] ?: @[];
+	while (_cells.count < _modules.count) {
+		IBCellView *cell = [IBCellView new];
+		[self insertSubview:cell belowSubview:_pinButton];
+		[_cells addObject:cell];
+	}
+	for (NSUInteger i = 0; i < _cells.count; i++) {
+		IBCellView *cell = _cells[i];
+		if (i >= _modules.count) {
+			cell.hidden = YES;
+			continue;
+		}
+		IBModule *m = _modules[i];
+		cell.hidden = NO;
+		cell.label.attributedText = m.text;
+		BOOL hasGraph = m.graphSeries.count > 0;
+		cell.graph.hidden = !hasGraph;
+		if (hasGraph) {
+			IBGraphView *g = cell.graph;
+			g.minValue = m.graphMin;
+			g.maxValue = m.graphMax;
+			g.minSpan = m.graphMinSpan > 0 ? m.graphMinSpan : 1;
+			g.colors = m.graphColors;
+			g.series = m.graphSeries; // redraws
+		}
+	}
 	[self setNeedsLayout];
 }
 
@@ -128,31 +204,97 @@ static const CGFloat kPinSize = 20;
 	return buttons;
 }
 
-- (BOOL)hasText {
-	return _label.attributedText.length > 0;
+- (BOOL)hasGraphAtIndex:(NSUInteger)i {
+	return i < _modules.count && _modules[i].graphSeries.count > 0;
 }
 
-// Space taken by the buttons next to the text
-- (CGFloat)buttonSpace {
-	NSUInteger n = [self visibleButtons].count;
-	if (n == 0) return 0;
-	if (_layout == IBLayoutList) return kPinSize + 2;
-	return n * kPinSize + 2;
+- (CGSize)computeLayoutForMaxWidth:(CGFloat)maxWidth {
+	[_cellFrames removeAllObjects];
+	[_labelFrames removeAllObjects];
+	[_graphFrames removeAllObjects];
+
+	NSUInteger nButtons = [self visibleButtons].count;
+	BOOL list = _layout == IBLayoutList;
+	CGFloat topPad = kPadV + _extraTop, botPad = kPadV + _extraBottom;
+	CGFloat minH = nButtons == 0 ? 0 : (list ? nButtons * kPinSize + 6 : kPinSize + 4);
+	minH += _extraTop + _extraBottom;
+
+	if (_modules.count == 0) {
+		// Buttons only (collapsed without values)
+		return CGSizeMake(MAX(nButtons, 1) * kPinSize + 8, MAX(minH, kPinSize + 4 + _extraTop + _extraBottom));
+	}
+
+	CGFloat contentX = list ? kPadH : (nButtons > 0 ? 4 + nButtons * kPinSize + 2 : kPadH);
+	CGFloat rightPad = list ? kPadH + (nButtons > 0 ? kPinSize + 2 : 0) : kPadH;
+	CGFloat availW = MAX(20, maxWidth - contentX - rightPad);
+
+	// Text sizes (measured the way the label really wraps so nothing is clipped)
+	NSUInteger n = _modules.count;
+	CGSize labelSizes[n];
+	CGFloat graphColumnX = 0;
+	for (NSUInteger i = 0; i < n; i++) {
+		CGSize ls = [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
+		labelSizes[i] = CGSizeMake(ceil(MIN(ls.width, availW)), ceil(ls.height));
+		if ([self hasGraphAtIndex:i]) graphColumnX = MAX(graphColumnX, labelSizes[i].width);
+	}
+	CGFloat gh = _graphHeight;
+
+	CGFloat contentW = 0, contentH = 0;
+	CGFloat x = 0, y = 0, lineH = 0;
+	CGFloat listGraphW = MIN(_graphWidth, MAX(20, availW - graphColumnX - kGraphGapSide));
+
+	for (NSUInteger i = 0; i < n; i++) {
+		BOOL hasGraph = [self hasGraphAtIndex:i];
+		CGSize ls = labelSizes[i];
+		CGRect cell, label, graph = CGRectZero;
+
+		if (list) {
+			CGFloat cw = hasGraph ? graphColumnX + kGraphGapSide + listGraphW : ls.width;
+			CGFloat ch = hasGraph ? MAX(ls.height, gh) : ls.height;
+			cell = CGRectMake(0, y, cw, ch);
+			label = CGRectMake(0, round((ch - ls.height) / 2), ls.width, ls.height);
+			if (hasGraph) graph = CGRectMake(graphColumnX + kGraphGapSide, round((ch - gh) / 2), listGraphW, gh);
+			y += ch + kLineGapList;
+			contentW = MAX(contentW, cw);
+			contentH = y - kLineGapList;
+		} else {
+			CGFloat cw = hasGraph ? MIN(MAX(ls.width, kMinGraphWidth), availW) : ls.width;
+			CGFloat ch = hasGraph ? ls.height + kGraphGapBelow + gh : ls.height;
+			if (x > 0 && x + cw > availW) {
+				// Wrap between modules
+				y += lineH + kLineGapRow;
+				x = 0;
+				lineH = 0;
+			}
+			cell = CGRectMake(x, y, cw, ch);
+			label = CGRectMake(0, 0, ls.width, ls.height);
+			if (hasGraph) graph = CGRectMake(0, ls.height + kGraphGapBelow, cw, gh);
+			x += cw + kCellGapH;
+			lineH = MAX(lineH, ch);
+			contentW = MAX(contentW, CGRectGetMaxX(cell));
+			contentH = y + lineH;
+		}
+		[_cellFrames addObject:[NSValue valueWithCGRect:cell]];
+		[_labelFrames addObject:[NSValue valueWithCGRect:label]];
+		[_graphFrames addObject:[NSValue valueWithCGRect:graph]];
+	}
+
+	CGFloat W = MIN(contentX + contentW + rightPad, maxWidth);
+	CGFloat H = MAX(contentH + topPad + botPad, minH);
+	// Center the content between the paddings (the buttons can make the bar taller)
+	CGFloat offsetY = topPad + MAX(0, (H - topPad - botPad - contentH) / 2);
+	for (NSUInteger i = 0; i < n; i++) {
+		CGRect c = _cellFrames[i].CGRectValue;
+		c.origin.x += contentX;
+		c.origin.y += offsetY;
+		_cellFrames[i] = [NSValue valueWithCGRect:c];
+	}
+	[self setNeedsLayout];
+	return CGSizeMake(W, H);
 }
 
 - (CGSize)preferredSizeForMaxWidth:(CGFloat)maxWidth {
-	NSUInteger n = [self visibleButtons].count;
-	CGFloat minH = n == 0 ? 0 : (_layout == IBLayoutList ? n * kPinSize + 6 : kPinSize + 4);
-	if (![self hasText]) {
-		// Buttons only (collapsed without values)
-		return CGSizeMake(MAX(n, 1) * kPinSize + 8, MAX(minH, kPinSize + 4));
-	}
-	CGFloat textMax = MAX(20, maxWidth - 2 * kPadH - [self buttonSpace]);
-	// Measure the way the label actually wraps so no line gets clipped
-	CGSize text = [_label sizeThatFits:CGSizeMake(textMax, CGFLOAT_MAX)];
-	CGFloat w = ceil(MIN(text.width, textMax)) + 2 * kPadH + [self buttonSpace];
-	CGFloat h = MAX(ceil(text.height) + 2 * kPadV, minH);
-	return CGSizeMake(MIN(w, maxWidth), h);
+	return [self computeLayoutForMaxWidth:maxWidth];
 }
 
 - (void)layoutSubviews {
@@ -160,23 +302,26 @@ static const CGFloat kPinSize = 20;
 	CGRect b = self.bounds;
 	_blurView.frame = b;
 	_tintView.frame = b;
+
+	if (_cellFrames.count != _modules.count) [self computeLayoutForMaxWidth:b.size.width];
+
 	NSArray<UIButton *> *buttons = [self visibleButtons];
-	_label.hidden = ![self hasText];
+	CGFloat contentTop = _extraTop, contentBottom = b.size.height - _extraBottom;
 	for (NSUInteger i = 0; i < buttons.count; i++) {
 		// bounds + center instead of frame since the pin may be rotated
 		buttons[i].bounds = CGRectMake(0, 0, kPinSize, kPinSize);
 		if (_layout == IBLayoutList)
-			buttons[i].center = CGPointMake(b.size.width - 3 - kPinSize / 2, 3 + kPinSize / 2 + i * kPinSize);
+			buttons[i].center = CGPointMake(b.size.width - 3 - kPinSize / 2, contentTop + 3 + kPinSize / 2 + i * kPinSize);
 		else
-			buttons[i].center = CGPointMake(4 + kPinSize / 2 + i * kPinSize, b.size.height / 2);
+			buttons[i].center = CGPointMake(4 + kPinSize / 2 + i * kPinSize, (contentTop + contentBottom) / 2);
 	}
-	if (_layout == IBLayoutList) {
-		// Buttons stacked top right, text on the left
-		_label.frame = CGRectMake(kPadH, kPadV, b.size.width - 2 * kPadH - [self buttonSpace], b.size.height - 2 * kPadV);
-	} else {
-		// Buttons side by side on the left, text next to them
-		CGFloat x = buttons.count > 0 ? 4 + buttons.count * kPinSize + 2 : kPadH;
-		_label.frame = CGRectMake(x, kPadV, b.size.width - x - kPadH, b.size.height - 2 * kPadV);
+
+	for (NSUInteger i = 0; i < _cells.count; i++) {
+		IBCellView *cell = _cells[i];
+		if (i >= _modules.count || i >= _cellFrames.count) continue;
+		cell.frame = _cellFrames[i].CGRectValue;
+		cell.label.frame = _labelFrames[i].CGRectValue;
+		if (!cell.graph.hidden) cell.graph.frame = _graphFrames[i].CGRectValue;
 	}
 }
 
