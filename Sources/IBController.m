@@ -26,6 +26,8 @@ static const CGFloat kMargin = 4;
 	BOOL _placed;
 	BOOL _screenBlanked;
 	CGSize _lastContainerSize;
+	CGFloat _appliedExtraTop;
+	CGFloat _appliedExtraBottom;
 	int _blankToken;
 }
 
@@ -133,9 +135,15 @@ static const CGFloat kMargin = 4;
 		if (oc.x < W / 3) center.x = oc.x - os.width / 2 + size.width / 2;
 		else if (oc.x > W * 2 / 3) center.x = oc.x + os.width / 2 - size.width / 2;
 		else center.x = oc.x;
-		if (oc.y > H * 2 / 3) center.y = oc.y + os.height / 2 - size.height / 2;
-		else center.y = oc.y - os.height / 2 + size.height / 2;
+		// Changing the top / bottom background extension must not move the content:
+		// the edge that is anchored stays, the other one grows.
+		CGFloat dTop = _prefs.bgExtendTop - _appliedExtraTop;
+		CGFloat dBottom = _prefs.bgExtendBottom - _appliedExtraBottom;
+		if (oc.y > H * 2 / 3) center.y = oc.y + os.height / 2 - size.height / 2 + dBottom;
+		else center.y = oc.y - os.height / 2 + size.height / 2 - dTop;
 	}
+	_appliedExtraTop = _prefs.bgExtendTop;
+	_appliedExtraBottom = _prefs.bgExtendBottom;
 
 	center.x = MIN(MAX(center.x, kMargin + size.width / 2), W - kMargin - size.width / 2);
 	center.y = MIN(MAX(center.y, kMargin + size.height / 2), H - kMargin - size.height / 2);
@@ -210,10 +218,10 @@ static const CGFloat kMargin = 4;
 		IBStats *stats = [IBStats sharedInstance];
 		stats.measureCPUFrequency = prefs.showCPUFreq && !prefs.collapsed;
 		[stats refresh];
-		NSAttributedString *text = [IBFormatter textForStats:stats prefs:prefs];
+		NSArray<IBModule *> *modules = [IBFormatter modulesForStats:stats prefs:prefs];
 		dispatch_async(dispatch_get_main_queue(), ^{
 			self->_refreshing = NO;
-			[self->_bar setText:text];
+			[self->_bar setModules:modules];
 			if (self->_animateNextLayout) {
 				// Animate collapsing / expanding
 				self->_animateNextLayout = NO;
