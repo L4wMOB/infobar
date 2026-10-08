@@ -164,7 +164,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow.</string>
+			<string>Summary shows the values selected below, in this order. âButtons onlyâ keeps just the pin and the arrow.</string>
 			<key>label</key>
 			<string>When collapsed, show</string>
 		</dict>
@@ -402,7 +402,7 @@
 			<key>key</key>
 			<string>useFahrenheit</string>
 			<key>label</key>
-			<string>Temperature in °F</string>
+			<string>Temperature in Â°F</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -515,6 +515,106 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Makes the background taller above the content. Only the top and bottom grow, the width stays the same.</string>
+			<key>label</key>
+			<string>Background extend â top</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<integer>0</integer>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>bgExtendTop</string>
+			<key>max</key>
+			<integer>40</integer>
+			<key>min</key>
+			<integer>0</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Background extend â bottom</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<integer>0</integer>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>bgExtendBottom</string>
+			<key>max</key>
+			<integer>40</integer>
+			<key>min</key>
+			<integer>0</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Graph height</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<integer>22</integer>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>graphHeight</string>
+			<key>max</key>
+			<integer>60</integer>
+			<key>min</key>
+			<integer>12</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Graphs are updated in real time with every update interval. In row layout the graph sits right below its value, in list layout it sits next to it.</string>
+			<key>label</key>
+			<string>Graph width (list layout)</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<integer>60</integer>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>graphWidth</string>
+			<key>max</key>
+			<integer>140</integer>
+			<key>min</key>
+			<integer>30</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>CPU</string>
 		</dict>
@@ -561,6 +661,20 @@
 			<string>Chip &amp; cores</string>
 		</dict>
 		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showCPUGraph</string>
+			<key>label</key>
+			<string>CPU graph</string>
+		</dict>
+		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
@@ -593,6 +707,20 @@
 			<string>showRAMGB</string>
 			<key>label</key>
 			<string>RAM used / total (GB)</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showRAMGraph</string>
+			<key>label</key>
+			<string>RAM graph</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -701,6 +829,48 @@
 			<string>Charge cycles</string>
 		</dict>
 		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showChargeGraph</string>
+			<key>label</key>
+			<string>Charge graph</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showTempGraph</string>
+			<key>label</key>
+			<string>Temperature graph</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showCyclesGraph</string>
+			<key>label</key>
+			<string>Charge cycles graph</string>
+		</dict>
+		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
@@ -718,7 +888,21 @@
 			<key>key</key>
 			<string>showNetwork</string>
 			<key>label</key>
-			<string>Speed ↓↑</string>
+			<string>Speed ââ</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>showNetworkGraph</string>
+			<key>label</key>
+			<string>Speed graph (network)</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
