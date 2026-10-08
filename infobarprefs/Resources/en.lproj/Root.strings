@@ -66,3 +66,15 @@
 "All InfoBar settings will be restored to their defaults." = "All InfoBar settings will be restored to their defaults.";
 "Cancel" = "Cancel";
 "Reset" = "Reset";
+"CPU graph" = "CPU graph";
+"RAM graph" = "RAM graph";
+"Charge graph" = "Charge graph";
+"Temperature graph" = "Temperature graph";
+"Charge cycles graph" = "Charge cycles graph";
+"Speed graph (network)" = "Speed graph (network)";
+"Background extend – top" = "Background extend – top";
+"Makes the background taller above the content. Only the top and bottom grow, the width stays the same." = "Makes the background taller above the content. Only the top and bottom grow, the width stays the same.";
+"Background extend – bottom" = "Background extend – bottom";
+"Graph height" = "Graph height";
+"Graph width (list layout)" = "Graph width (list layout)";
+"Graphs are updated in real time with every update interval. In row layout the graph sits right below its value, in list layout it sits next to it." = "Graphs are updated in real time with every update interval. In row layout the graph sits right below its value, in list layout it sits next to it.";
