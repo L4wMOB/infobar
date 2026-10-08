@@ -13,7 +13,7 @@
 "Row" = "Ligne";
 "List" = "Liste";
 "When collapsed, show" = "Quand réduite, afficher";
-"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Le résumé affiche jusqu’à 4 des valeurs choisies ci-dessous, dans cet ordre. « Boutons seulement » ne garde que l’épingle et la flèche.";
+"Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Le résumé affiche les valeurs choisies ci-dessous, dans cet ordre. « Boutons seulement » ne garde que l’épingle et la flèche.";
 "Summary" = "Résumé";
 "Buttons only" = "Boutons seuls";
 "Update interval (seconds)" = "Intervalle de mise à jour (secondes)";
@@ -66,5 +66,3 @@
 "All InfoBar settings will be restored to their defaults." = "Tous les réglages d’InfoBar seront rétablis à leurs valeurs par défaut.";
 "Cancel" = "Annuler";
 "Reset" = "Réinitialiser";
-"Maximum 4 values" = "4 valeurs maximum";
-"Turn off another value first." = "Désactivez d’abord une autre valeur.";

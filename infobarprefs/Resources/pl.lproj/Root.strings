@@ -13,7 +13,7 @@
 "Row" = "Wiersz";
 "List" = "Lista";
 "When collapsed, show" = "Po zwinięciu pokaż";
-"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Podsumowanie pokazuje do 4 wartości wybranych poniżej, w tej kolejności. „Tylko przyciski” zostawia tylko pinezkę i strzałkę.";
+"Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Podsumowanie pokazuje wartości wybrane poniżej, w tej kolejności. „Tylko przyciski” zostawia tylko pinezkę i strzałkę.";
 "Summary" = "Podsumowanie";
 "Buttons only" = "Tylko przyciski";
 "Update interval (seconds)" = "Interwał odświeżania (sekundy)";
@@ -66,5 +66,3 @@
 "All InfoBar settings will be restored to their defaults." = "Wszystkie ustawienia InfoBar zostaną przywrócone do wartości domyślnych.";
 "Cancel" = "Anuluj";
 "Reset" = "Resetuj";
-"Maximum 4 values" = "Maksymalnie 4 wartości";
-"Turn off another value first." = "Najpierw wyłącz inną wartość.";

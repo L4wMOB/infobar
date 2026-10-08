@@ -13,7 +13,7 @@
 "Row" = "横排";
 "List" = "列表";
 "When collapsed, show" = "折叠时显示";
-"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "摘要按此顺序显示下方所选的最多 4 项。“仅按钮”只保留图钉和箭头。";
+"Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "摘要按此顺序显示下方所选的项。“仅按钮”只保留图钉和箭头。";
 "Summary" = "摘要";
 "Buttons only" = "仅按钮";
 "Update interval (seconds)" = "更新间隔（秒）";
@@ -66,5 +66,3 @@
 "All InfoBar settings will be restored to their defaults." = "所有 InfoBar 设置都将恢复为默认值。";
 "Cancel" = "取消";
 "Reset" = "重置";
-"Maximum 4 values" = "最多 4 项";
-"Turn off another value first." = "请先关闭另一项。";

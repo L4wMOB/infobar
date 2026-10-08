@@ -13,7 +13,7 @@
 "Row" = "Riga";
 "List" = "Elenco";
 "When collapsed, show" = "Quando compressa, mostra";
-"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Il riepilogo mostra fino a 4 dei valori scelti qui sotto, in quest’ordine. «Solo pulsanti» mantiene solo la puntina e la freccia.";
+"Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "Il riepilogo mostra i valori scelti qui sotto, in quest’ordine. «Solo pulsanti» mantiene solo la puntina e la freccia.";
 "Summary" = "Riepilogo";
 "Buttons only" = "Solo pulsanti";
 "Update interval (seconds)" = "Intervallo di aggiornamento (secondi)";
@@ -66,5 +66,3 @@
 "All InfoBar settings will be restored to their defaults." = "Tutte le impostazioni di InfoBar verranno ripristinate ai valori predefiniti.";
 "Cancel" = "Annulla";
 "Reset" = "Reimposta";
-"Maximum 4 values" = "Massimo 4 valori";
-"Turn off another value first." = "Disattiva prima un altro valore.";

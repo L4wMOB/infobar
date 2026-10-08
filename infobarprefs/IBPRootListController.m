@@ -16,32 +16,10 @@
 }
 
 - (void)setPreferenceValue:(id)value specifier:(PSSpecifier *)specifier {
-	NSString *key = [specifier propertyForKey:@"key"];
-	if ([key hasPrefix:@"collapsedShow"] && [value boolValue] && [self collapsedValueCount] >= 4) {
-		// The collapsed bar shows at most 4 values
-		[self reloadSpecifier:specifier animated:YES];
-		NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-		UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedStringFromTableInBundle(@"Maximum 4 values", @"Root", bundle, nil)
-		                                                               message:NSLocalizedStringFromTableInBundle(@"Turn off another value first.", @"Root", bundle, nil)
-		                                                        preferredStyle:UIAlertControllerStyleAlert];
-		[alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
-		[self presentViewController:alert animated:YES completion:nil];
-		return;
-	}
 	[super setPreferenceValue:value specifier:specifier];
 	// Make sure cfprefsd has the value before SpringBoard re-reads it
 	CFPreferencesAppSynchronize(CFSTR("com.mathelord.infobar"));
 	notify_post("com.mathelord.infobar/prefschanged");
-}
-
-- (NSInteger)collapsedValueCount {
-	NSInteger count = 0;
-	for (PSSpecifier *spec in [self specifiers]) {
-		NSString *key = [spec propertyForKey:@"key"];
-		if (![key hasPrefix:@"collapsedShow"]) continue;
-		if ([[self readPreferenceValue:spec] boolValue]) count++;
-	}
-	return count;
 }
 
 - (void)resetPosition {

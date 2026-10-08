@@ -13,7 +13,7 @@
 "Row" = "가로 배열";
 "List" = "목록";
 "When collapsed, show" = "접었을 때 표시";
-"Summary shows up to 4 of the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "요약에는 아래에서 선택한 값이 최대 4개까지 이 순서로 표시됩니다. ‘버튼만’은 핀과 화살표만 남깁니다.";
+"Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow." = "요약에는 아래에서 선택한 값이 이 순서로 표시됩니다. ‘버튼만’은 핀과 화살표만 남깁니다.";
 "Summary" = "요약";
 "Buttons only" = "버튼만";
 "Update interval (seconds)" = "업데이트 간격(초)";
@@ -66,5 +66,3 @@
 "All InfoBar settings will be restored to their defaults." = "모든 InfoBar 설정이 기본값으로 복원됩니다.";
 "Cancel" = "취소";
 "Reset" = "초기화";
-"Maximum 4 values" = "최대 4개";
-"Turn off another value first." = "먼저 다른 값을 끄세요.";
