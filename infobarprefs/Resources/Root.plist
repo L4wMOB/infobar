@@ -402,7 +402,7 @@
 			<key>key</key>
 			<string>useFahrenheit</string>
 			<key>label</key>
-			<string>Temperature in Â°F</string>
+			<string>Temperature in °F</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -518,7 +518,7 @@
 			<key>footerText</key>
 			<string>Makes the background taller above the content. Only the top and bottom grow, the width stays the same.</string>
 			<key>label</key>
-			<string>Background extend â top</string>
+			<string>Background extend - top</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -542,7 +542,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>Background extend â bottom</string>
+			<string>Background extend -bottom</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -626,7 +626,7 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>0.6</real>
+			<real>0.9</real>
 			<key>defaults</key>
 			<string>com.mathelord.infobar</string>
 			<key>key</key>
@@ -914,7 +914,7 @@
 			<key>key</key>
 			<string>showNetwork</string>
 			<key>label</key>
-			<string>Speed ââ</string>
+			<string>Speed ↓↑</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
