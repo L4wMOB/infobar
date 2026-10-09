@@ -58,9 +58,7 @@ static const CGFloat kMinGraphWidth = 44;
 	CGFloat _graphHeight, _graphWidth;
 	CGFloat _extraTop, _extraBottom;
 	CGFloat _fontSize;
-	// Widest width seen per module. Keeps the bar from growing and shrinking
-	// when a value gets longer / shorter (5% -> 10%); reset when the set of
-	// modules, the layout, the font or the available width changes.
+	CGFloat _shadowStrength;
 	NSMutableDictionary<NSString *, NSNumber *> *_stickyWidths;
 	NSString *_moduleSignature;
 	CGFloat _lastMaxWidth;
@@ -82,6 +80,7 @@ static const CGFloat kMinGraphWidth = 44;
 		_graphFrames = [NSMutableArray array];
 		_graphHeight = 22;
 		_graphWidth = 60;
+		_shadowStrength = 0.6;
 		_stickyWidths = [NSMutableDictionary dictionary];
 		_moduleSignature = @"";
 
@@ -142,6 +141,8 @@ static const CGFloat kMinGraphWidth = 44;
 	[self updateCollapseAppearance];
 	_doubleTap.enabled = prefs.doubleTapTogglesLayout;
 
+	_shadowStrength = prefs.shadowStrength;
+	for (IBCellView *cell in _cells) [self applyShadowToCell:cell];
 	_graphHeight = prefs.graphHeight;
 	_graphWidth = prefs.graphWidth;
 	_extraTop = prefs.bgExtendTop;
@@ -191,6 +192,7 @@ static const CGFloat kMinGraphWidth = 44;
 	}
 	while (_cells.count < _modules.count) {
 		IBCellView *cell = [IBCellView new];
+		[self applyShadowToCell:cell];
 		[self insertSubview:cell belowSubview:_pinButton];
 		[_cells addObject:cell];
 	}
@@ -213,10 +215,21 @@ static const CGFloat kMinGraphWidth = 44;
 			g.colors = m.graphColors;
 			g.bandColors = m.graphBandColors;
 			g.bandThresholds = m.graphThresholds;
+			g.thresholdColors = m.graphThresholdColors;
 			g.series = m.graphSeries; // redraws
 		}
 	}
 	[self setNeedsLayout];
+}
+
+- (void)applyShadowToCell:(IBCellView *)cell {
+	CALayer *layer = cell.layer;
+	layer.masksToBounds = NO;
+	layer.shadowColor = [UIColor blackColor].CGColor;
+	layer.shadowOpacity = (float)MIN(MAX(_shadowStrength, 0), 1);
+	layer.shadowRadius = 3.5;
+	layer.shadowOffset = CGSizeMake(0, 1);
+	layer.shouldRasterize = NO;
 }
 
 - (NSArray<UIButton *> *)visibleButtons {
@@ -246,6 +259,7 @@ static const CGFloat kMinGraphWidth = 44;
 		return CGSizeMake(MAX(nButtons, 1) * kPinSize + 8, MAX(minH, kPinSize + 4 + _extraTop + _extraBottom));
 	}
 
+	// Row: buttons on the left of the content. List: buttons stacked on the right.
 	CGFloat contentX = list ? kPadH : (nButtons > 0 ? 4 + nButtons * kPinSize + 2 : kPadH);
 	CGFloat rightPad = list ? kPadH + (nButtons > 0 ? kPinSize + 2 : 0) : kPadH;
 	CGFloat availW = MAX(20, maxWidth - contentX - rightPad);
@@ -273,11 +287,13 @@ static const CGFloat kMinGraphWidth = 44;
 
 	CGFloat contentW = 0, contentH = 0;
 	CGFloat x = 0, y = 0, lineH = 0;
+	// List: all graphs have the same width. Row: a graph is as wide as its value.
 	CGFloat listGraphW = MIN(MAX(_graphWidth, graphColumnW), availW);
 
 	for (NSUInteger i = 0; i < n; i++) {
 		BOOL hasGraph = [self hasGraphAtIndex:i];
 		CGSize ls = labelSizes[i];
+		// In both layouts the graph sits right below its value
 		CGFloat cw = ls.width;
 		if (hasGraph) cw = list ? listGraphW : MIN(MAX(ls.width, kMinGraphWidth), availW);
 		CGFloat ch = hasGraph ? ls.height + kGraphGapBelow + gh : ls.height;
