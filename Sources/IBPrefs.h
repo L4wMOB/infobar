@@ -58,6 +58,7 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) double bgExtendBottom;
 @property (nonatomic, readonly) double graphHeight;
 @property (nonatomic, readonly) double graphWidth;
+@property (nonatomic, readonly) double shadowStrength;
 
 // Modules
 @property (nonatomic, readonly) BOOL showTime;
