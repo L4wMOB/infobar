@@ -5,6 +5,8 @@ NS_ASSUME_NONNULL_BEGIN
 @interface IBGraphView : UIView
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *series;
 @property (nonatomic, copy) NSArray<UIColor *> *colors;
+@property (nonatomic, copy) NSArray<UIColor *> *bandColors;
+@property (nonatomic, copy) NSArray<NSNumber *> *bandThresholds;
 // Fixed bounds of the value range; NAN = automatic
 @property (nonatomic) double minValue;
 @property (nonatomic) double maxValue;
