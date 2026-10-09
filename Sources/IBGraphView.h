@@ -7,6 +7,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<UIColor *> *colors;
 @property (nonatomic, copy) NSArray<UIColor *> *bandColors;
 @property (nonatomic, copy) NSArray<NSNumber *> *bandThresholds;
+@property (nonatomic, copy) NSArray<UIColor *> *thresholdColors;
 // Fixed bounds of the value range; NAN = automatic
 @property (nonatomic) double minValue;
 @property (nonatomic) double maxValue;
