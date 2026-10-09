@@ -2,7 +2,17 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef NS_ENUM(NSInteger, IBGraphUnit) {
+	IBGraphUnitNumber,
+	IBGraphUnitPercent,
+	IBGraphUnitDegrees,
+	IBGraphUnitBytesPerSec,
+};
+
 @interface IBGraphView : UIView
+@property (nonatomic) IBGraphUnit unit;
+@property (nonatomic) double valueScale;
+@property (nonatomic) double valueOffset;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *series;
 @property (nonatomic, copy) NSArray<UIColor *> *colors;
 @property (nonatomic, copy) NSArray<UIColor *> *bandColors;
