@@ -90,6 +90,7 @@ static UIColor *IBColorNamed(NSString *name) {
 		_bgExtendBottom = IBDouble(d, @"bgExtendBottom", 0, 0, 40);
 		_graphHeight = IBDouble(d, @"graphHeight", 22, 12, 60);
 		_graphWidth = IBDouble(d, @"graphWidth", 60, 30, 140);
+		_shadowStrength = IBDouble(d, @"shadowStrength", 0.6, 0, 1);
 
 		_showTime = IBBool(d, @"showTime", NO);
 		_showCPU = IBBool(d, @"showCPU", YES);
