@@ -69,13 +69,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 }
 
 @interface IBItem : NSObject
-@property (nonatomic, copy) NSArray<NSString *> *symbols; // first available SF Symbol is used
-@property (nonatomic, copy) NSString *label;              // short name when icons are off
+@property (nonatomic, copy) NSArray<NSString *> *symbols;
+@property (nonatomic, copy) NSString *label;
 @property (nonatomic, strong) NSMutableAttributedString *value;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
 @property (nonatomic, copy) NSArray<UIColor *> *graphColors;
 @property (nonatomic, copy) NSArray<UIColor *> *graphBandColors;
 @property (nonatomic, copy) NSArray<NSNumber *> *graphThresholds;
+@property (nonatomic, copy) NSArray<UIColor *> *graphThresholdColors;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
@@ -135,10 +136,6 @@ static NSString *IBDuration(NSTimeInterval t) {
 		[item.value appendAttributedString:[[NSAttributedString alloc] initWithString:text attributes:@{NSFontAttributeName: smallFont, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.75]}]];
 	};
 
-	// Attaches a realtime graph to an item. Colors follow the "color-coded" setting.
-	// Attaches a realtime graph to an item. The first series is drawn in 3 height
-	// levels (like MSI Afterburner): low / medium / high, same colors and
-	// thresholds as the text values. Without "color-coded" it is a single color.
 	UIColor *goodC = p.colorizeValues ? IBLevelColor(IBLevelGood, base) : base;
 	UIColor *warnC = p.colorizeValues ? IBLevelColor(IBLevelWarn, base) : base;
 	UIColor *critC = p.colorizeValues ? IBLevelColor(IBLevelCritical, base) : base;
@@ -150,6 +147,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 		item.graphMinSpan = minSpan;
 		item.graphThresholds = @[@(t1), @(t2)];
 		item.graphBandColors = ascending ? @[goodC, warnC, critC] : @[critC, warnC, goodC];
+		item.graphThresholdColors = !p.colorizeValues ? @[] : (ascending ? @[warnC, critC] : @[critC, warnC]);
 	};
 
 	if (collapsed) {
@@ -356,6 +354,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 		m.graphColors = item.graphColors ?: @[];
 		m.graphBandColors = item.graphBandColors ?: @[];
 		m.graphThresholds = item.graphThresholds ?: @[];
+		m.graphThresholdColors = item.graphThresholdColors ?: @[];
 		m.graphMin = item.graphSeries ? item.graphMin : NAN;
 		m.graphMax = item.graphSeries ? item.graphMax : NAN;
 		m.graphMinSpan = item.graphMinSpan;
@@ -370,6 +369,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 		m.graphColors = @[];
 		m.graphBandColors = @[];
 		m.graphThresholds = @[];
+		m.graphThresholdColors = @[];
 		m.graphMin = NAN;
 		m.graphMax = NAN;
 		[modules addObject:m];
