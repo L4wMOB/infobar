@@ -20,7 +20,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 @implementation IBGraphView {
 	CADisplayLink *_link;
 	CFTimeInterval _animStart;
-	CGFloat _progress;
+	CGFloat _progress;       // 0 -> 1 during a scroll
 	BOOL _rangeInit;
 	double _curLo, _curHi;
 	BOOL _rangeConverged;
@@ -30,7 +30,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	if ((self = [super initWithFrame:frame])) {
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
-		self.userInteractionEnabled = NO; // touches go to the bar (drag, double tap)
+		self.userInteractionEnabled = NO;
 		self.contentMode = UIViewContentModeRedraw;
 		_series = @[];
 		_colors = @[];
@@ -63,9 +63,11 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	series = [series copy] ?: @[];
 	if ([series isEqualToArray:old]) return;
 	_series = series;
-
-	BOOL scroll = old.count > 0 && old.count == series.count && series.firstObject.count >= 2 && _rangeInit
-		&& series.firstObject.count >= old.firstObject.count && series.firstObject.count <= old.firstObject.count + 1;
+	NSArray *newFirst = series.firstObject;
+	NSArray *oldFirst = old.firstObject;
+	NSUInteger newCount = newFirst.count, oldCount = oldFirst.count;
+	BOOL scroll = old.count > 0 && old.count == series.count && newCount >= 2 && _rangeInit
+		&& newCount >= oldCount && newCount <= oldCount + 1;
 	if (scroll) {
 		_progress = 0;
 		_animStart = CACurrentMediaTime();
