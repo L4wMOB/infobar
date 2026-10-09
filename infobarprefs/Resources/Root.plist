@@ -615,6 +615,32 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Soft shadow behind all text, icons and graphs. 0 turns it off.</string>
+			<key>label</key>
+			<string>Shadow</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.6</real>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>shadowStrength</string>
+			<key>max</key>
+			<integer>1</integer>
+			<key>min</key>
+			<integer>0</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>CPU</string>
 		</dict>
