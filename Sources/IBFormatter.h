@@ -12,6 +12,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<UIColor *> *graphBandColors;
 @property (nonatomic, copy) NSArray<NSNumber *> *graphThresholds;
 @property (nonatomic, copy) NSArray<UIColor *> *graphThresholdColors;
+@property (nonatomic) NSInteger graphUnit;
+@property (nonatomic) double graphValueScale;
+@property (nonatomic) double graphValueOffset;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
