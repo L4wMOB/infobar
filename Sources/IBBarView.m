@@ -10,7 +10,6 @@ static const CGFloat kCellGapH = 12;
 static const CGFloat kLineGapRow = 4;
 static const CGFloat kLineGapList = 3;
 static const CGFloat kGraphGapBelow = 2;
-static const CGFloat kGraphGapSide = 6;
 static const CGFloat kMinGraphWidth = 44;
 
 #pragma mark - Cell (one module: text + optional graph)
@@ -58,6 +57,13 @@ static const CGFloat kMinGraphWidth = 44;
 	NSMutableArray<IBCellView *> *_cells;
 	CGFloat _graphHeight, _graphWidth;
 	CGFloat _extraTop, _extraBottom;
+	CGFloat _fontSize;
+	// Widest width seen per module. Keeps the bar from growing and shrinking
+	// when a value gets longer / shorter (5% -> 10%); reset when the set of
+	// modules, the layout, the font or the available width changes.
+	NSMutableDictionary<NSString *, NSNumber *> *_stickyWidths;
+	NSString *_moduleSignature;
+	CGFloat _lastMaxWidth;
 	// Cached layout (relative to the bar), see -computeLayoutForMaxWidth:
 	NSMutableArray<NSValue *> *_cellFrames;
 	NSMutableArray<NSValue *> *_labelFrames;
@@ -76,6 +82,8 @@ static const CGFloat kMinGraphWidth = 44;
 		_graphFrames = [NSMutableArray array];
 		_graphHeight = 22;
 		_graphWidth = 60;
+		_stickyWidths = [NSMutableDictionary dictionary];
+		_moduleSignature = @"";
 
 		_blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
 		_blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -117,9 +125,15 @@ static const CGFloat kMinGraphWidth = 44;
 #pragma mark Preferences
 
 - (void)applyPrefs:(IBPrefs *)prefs {
+	BOOL wasCollapsed = _collapsed;
+	IBLayout oldLayout = _layout;
 	_collapsed = prefs.collapsed;
 	// Always a single row when collapsed
 	_layout = _collapsed ? IBLayoutRow : prefs.layout;
+	if (wasCollapsed != _collapsed || oldLayout != _layout || _fontSize != prefs.fontSize) {
+		[_stickyWidths removeAllObjects];
+		_fontSize = prefs.fontSize;
+	}
 	_showPin = prefs.showPinButton;
 	_pinButton.hidden = !_showPin;
 	// The button must stay visible while collapsed, otherwise there's no way back
@@ -169,6 +183,12 @@ static const CGFloat kMinGraphWidth = 44;
 
 - (void)setModules:(NSArray<IBModule *> *)modules {
 	_modules = [modules copy] ?: @[];
+	NSMutableString *signature = [NSMutableString string];
+	for (IBModule *m in _modules) [signature appendFormat:@"%@|", m.identifier ?: @""];
+	if (![signature isEqualToString:_moduleSignature]) {
+		_moduleSignature = [signature copy];
+		[_stickyWidths removeAllObjects]; // modules added / removed: size from scratch
+	}
 	while (_cells.count < _modules.count) {
 		IBCellView *cell = [IBCellView new];
 		[self insertSubview:cell belowSubview:_pinButton];
@@ -191,6 +211,8 @@ static const CGFloat kMinGraphWidth = 44;
 			g.maxValue = m.graphMax;
 			g.minSpan = m.graphMinSpan > 0 ? m.graphMinSpan : 1;
 			g.colors = m.graphColors;
+			g.bandColors = m.graphBandColors;
+			g.bandThresholds = m.graphThresholds;
 			g.series = m.graphSeries; // redraws
 		}
 	}
@@ -228,38 +250,46 @@ static const CGFloat kMinGraphWidth = 44;
 	CGFloat rightPad = list ? kPadH + (nButtons > 0 ? kPinSize + 2 : 0) : kPadH;
 	CGFloat availW = MAX(20, maxWidth - contentX - rightPad);
 
-	// Text sizes (measured the way the label really wraps so nothing is clipped)
+	if (fabs(maxWidth - _lastMaxWidth) > 0.5) {
+		_lastMaxWidth = maxWidth;
+		[_stickyWidths removeAllObjects];
+	}
+
+	// Text sizes (measured the way the label really wraps so nothing is clipped).
+	// A module never gets narrower than the widest it has been so far.
 	NSUInteger n = _modules.count;
 	CGSize labelSizes[n];
-	CGFloat graphColumnX = 0;
+	CGFloat graphColumnW = 0;
 	for (NSUInteger i = 0; i < n; i++) {
 		CGSize ls = [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
-		labelSizes[i] = CGSizeMake(ceil(MIN(ls.width, availW)), ceil(ls.height));
-		if ([self hasGraphAtIndex:i]) graphColumnX = MAX(graphColumnX, labelSizes[i].width);
+		NSString *key = [NSString stringWithFormat:@"%lu-%@", (unsigned long)i, _modules[i].identifier ?: @""];
+		CGFloat lw = MAX(ceil(MIN(ls.width, availW)), _stickyWidths[key].doubleValue);
+		lw = MIN(lw, availW);
+		_stickyWidths[key] = @(lw);
+		labelSizes[i] = CGSizeMake(lw, ceil(ls.height));
+		if ([self hasGraphAtIndex:i]) graphColumnW = MAX(graphColumnW, lw);
 	}
 	CGFloat gh = _graphHeight;
 
 	CGFloat contentW = 0, contentH = 0;
 	CGFloat x = 0, y = 0, lineH = 0;
-	CGFloat listGraphW = MIN(_graphWidth, MAX(20, availW - graphColumnX - kGraphGapSide));
+	CGFloat listGraphW = MIN(MAX(_graphWidth, graphColumnW), availW);
 
 	for (NSUInteger i = 0; i < n; i++) {
 		BOOL hasGraph = [self hasGraphAtIndex:i];
 		CGSize ls = labelSizes[i];
-		CGRect cell, label, graph = CGRectZero;
+		CGFloat cw = ls.width;
+		if (hasGraph) cw = list ? listGraphW : MIN(MAX(ls.width, kMinGraphWidth), availW);
+		CGFloat ch = hasGraph ? ls.height + kGraphGapBelow + gh : ls.height;
+		CGRect cell, label = CGRectMake(0, 0, ls.width, ls.height), graph = CGRectZero;
+		if (hasGraph) graph = CGRectMake(0, ls.height + kGraphGapBelow, cw, gh);
 
 		if (list) {
-			CGFloat cw = hasGraph ? graphColumnX + kGraphGapSide + listGraphW : ls.width;
-			CGFloat ch = hasGraph ? MAX(ls.height, gh) : ls.height;
 			cell = CGRectMake(0, y, cw, ch);
-			label = CGRectMake(0, round((ch - ls.height) / 2), ls.width, ls.height);
-			if (hasGraph) graph = CGRectMake(graphColumnX + kGraphGapSide, round((ch - gh) / 2), listGraphW, gh);
 			y += ch + kLineGapList;
 			contentW = MAX(contentW, cw);
 			contentH = y - kLineGapList;
 		} else {
-			CGFloat cw = hasGraph ? MIN(MAX(ls.width, kMinGraphWidth), availW) : ls.width;
-			CGFloat ch = hasGraph ? ls.height + kGraphGapBelow + gh : ls.height;
 			if (x > 0 && x + cw > availW) {
 				// Wrap between modules
 				y += lineH + kLineGapRow;
@@ -267,8 +297,6 @@ static const CGFloat kMinGraphWidth = 44;
 				lineH = 0;
 			}
 			cell = CGRectMake(x, y, cw, ch);
-			label = CGRectMake(0, 0, ls.width, ls.height);
-			if (hasGraph) graph = CGRectMake(0, ls.height + kGraphGapBelow, cw, gh);
 			x += cw + kCellGapH;
 			lineH = MAX(lineH, ch);
 			contentW = MAX(contentW, CGRectGetMaxX(cell));
