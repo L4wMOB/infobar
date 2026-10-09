@@ -61,6 +61,7 @@ static const CGFloat kMinGraphWidth = 44;
 	CGFloat _shadowStrength;
 	NSMutableDictionary<NSString *, NSNumber *> *_stickyWidths;
 	NSString *_moduleSignature;
+	NSMutableDictionary<NSString *, NSString *> *_stickyShapes; // text "shape" the width belongs to
 	CGFloat _lastMaxWidth;
 	// Cached layout (relative to the bar), see -computeLayoutForMaxWidth:
 	NSMutableArray<NSValue *> *_cellFrames;
@@ -80,8 +81,9 @@ static const CGFloat kMinGraphWidth = 44;
 		_graphFrames = [NSMutableArray array];
 		_graphHeight = 22;
 		_graphWidth = 60;
-		_shadowStrength = 0.6;
+		_shadowStrength = 0.9;
 		_stickyWidths = [NSMutableDictionary dictionary];
+		_stickyShapes = [NSMutableDictionary dictionary];
 		_moduleSignature = @"";
 
 		_blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
@@ -131,6 +133,7 @@ static const CGFloat kMinGraphWidth = 44;
 	_layout = _collapsed ? IBLayoutRow : prefs.layout;
 	if (wasCollapsed != _collapsed || oldLayout != _layout || _fontSize != prefs.fontSize) {
 		[_stickyWidths removeAllObjects];
+		[_stickyShapes removeAllObjects];
 		_fontSize = prefs.fontSize;
 	}
 	_showPin = prefs.showPinButton;
@@ -189,6 +192,7 @@ static const CGFloat kMinGraphWidth = 44;
 	if (![signature isEqualToString:_moduleSignature]) {
 		_moduleSignature = [signature copy];
 		[_stickyWidths removeAllObjects]; // modules added / removed: size from scratch
+		[_stickyShapes removeAllObjects];
 	}
 	while (_cells.count < _modules.count) {
 		IBCellView *cell = [IBCellView new];
@@ -203,8 +207,16 @@ static const CGFloat kMinGraphWidth = 44;
 			continue;
 		}
 		IBModule *m = _modules[i];
+		BOOL wasHidden = cell.hidden;
 		cell.hidden = NO;
-		cell.label.attributedText = m.text;
+		if (!wasHidden && cell.label.attributedText.length > 0 && ![cell.label.attributedText.string isEqualToString:m.text.string]) {
+			[UIView transitionWithView:cell.label duration:0.3
+							   options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
+							animations:^{ cell.label.attributedText = m.text; }
+							completion:nil];
+		} else {
+			cell.label.attributedText = m.text;
+		}
 		BOOL hasGraph = m.graphSeries.count > 0;
 		cell.graph.hidden = !hasGraph;
 		if (hasGraph) {
@@ -216,6 +228,9 @@ static const CGFloat kMinGraphWidth = 44;
 			g.bandColors = m.graphBandColors;
 			g.bandThresholds = m.graphThresholds;
 			g.thresholdColors = m.graphThresholdColors;
+			g.unit = (IBGraphUnit)m.graphUnit;
+			g.valueScale = m.graphValueScale;
+			g.valueOffset = m.graphValueOffset;
 			g.series = m.graphSeries; // redraws
 		}
 	}
@@ -223,13 +238,36 @@ static const CGFloat kMinGraphWidth = 44;
 }
 
 - (void)applyShadowToCell:(IBCellView *)cell {
+	CGFloat s = MIN(MAX(_shadowStrength, 0), 1);
 	CALayer *layer = cell.layer;
 	layer.masksToBounds = NO;
 	layer.shadowColor = [UIColor blackColor].CGColor;
-	layer.shadowOpacity = (float)MIN(MAX(_shadowStrength, 0), 1);
+	layer.shadowOpacity = (float)s;
 	layer.shadowRadius = 3.5;
 	layer.shadowOffset = CGSizeMake(0, 1);
-	layer.shouldRasterize = NO;
+	CALayer *text = cell.label.layer;
+	text.masksToBounds = NO;
+	text.shadowColor = [UIColor blackColor].CGColor;
+	text.shadowOpacity = (float)MIN(1.0, s * 1.25);
+	text.shadowRadius = 1.4;
+	text.shadowOffset = CGSizeMake(0, 0.75);
+}
+
+static NSString *IBTextShape(NSString *text) {
+	NSMutableString *out = [NSMutableString string];
+	unichar prev = 0;
+	for (NSUInteger i = 0; i < text.length; i++) {
+		unichar c = [text characterAtIndex:i];
+		unichar kind = c;
+		if ((c >= '0' && c <= '9') || c == '.' || c == ',') kind = '0';
+		else if ([[NSCharacterSet letterCharacterSet] characterIsMember:c]) kind = 'a';
+		else if (c == 0x2007 || c == 0x2060 || c == 0xFFFC) continue; // padding / icon
+		else if (c == 0x00A0) kind = ' ';
+		if (kind == prev && (kind == '0' || kind == 'a')) continue;
+		[out appendFormat:@"%C", kind];
+		prev = kind;
+	}
+	return out;
 }
 
 - (NSArray<UIButton *> *)visibleButtons {
@@ -259,7 +297,17 @@ static const CGFloat kMinGraphWidth = 44;
 		return CGSizeMake(MAX(nButtons, 1) * kPinSize + 8, MAX(minH, kPinSize + 4 + _extraTop + _extraBottom));
 	}
 
-	// Row: buttons on the left of the content. List: buttons stacked on the right.
+	{
+		IBModule *firstModule = _modules.firstObject;
+		NSAttributedString *t = firstModule.text;
+		UIFont *f = t.length > 0 ? [t attribute:NSFontAttributeName atIndex:t.length - 1 effectiveRange:NULL] : nil;
+		if (f) {
+			CGFloat topGap = f.ascender - f.capHeight;
+			CGFloat bottomGap = [self hasGraphAtIndex:_modules.count - 1] ? 0 : -f.descender;
+			topPad -= MIN(MAX(0, topGap - bottomGap), kPadV - 1);
+		}
+	}
+
 	CGFloat contentX = list ? kPadH : (nButtons > 0 ? 4 + nButtons * kPinSize + 2 : kPadH);
 	CGFloat rightPad = list ? kPadH + (nButtons > 0 ? kPinSize + 2 : 0) : kPadH;
 	CGFloat availW = MAX(20, maxWidth - contentX - rightPad);
@@ -267,16 +315,20 @@ static const CGFloat kMinGraphWidth = 44;
 	if (fabs(maxWidth - _lastMaxWidth) > 0.5) {
 		_lastMaxWidth = maxWidth;
 		[_stickyWidths removeAllObjects];
+		[_stickyShapes removeAllObjects];
 	}
 
-	// Text sizes (measured the way the label really wraps so nothing is clipped).
-	// A module never gets narrower than the widest it has been so far.
 	NSUInteger n = _modules.count;
 	CGSize labelSizes[n];
 	CGFloat graphColumnW = 0;
 	for (NSUInteger i = 0; i < n; i++) {
 		CGSize ls = [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
 		NSString *key = [NSString stringWithFormat:@"%lu-%@", (unsigned long)i, _modules[i].identifier ?: @""];
+		NSString *shape = IBTextShape(_modules[i].text.string);
+		if (![_stickyShapes[key] isEqualToString:shape]) {
+			_stickyShapes[key] = shape;
+			[_stickyWidths removeObjectForKey:key];
+		}
 		CGFloat lw = MAX(ceil(MIN(ls.width, availW)), _stickyWidths[key].doubleValue);
 		lw = MIN(lw, availW);
 		_stickyWidths[key] = @(lw);
@@ -287,7 +339,6 @@ static const CGFloat kMinGraphWidth = 44;
 
 	CGFloat contentW = 0, contentH = 0;
 	CGFloat x = 0, y = 0, lineH = 0;
-	// List: all graphs have the same width. Row: a graph is as wide as its value.
 	CGFloat listGraphW = MIN(MAX(_graphWidth, graphColumnW), availW);
 
 	for (NSUInteger i = 0; i < n; i++) {
