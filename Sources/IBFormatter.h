@@ -5,9 +5,12 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface IBModule : NSObject
+@property (nonatomic, copy) NSString *identifier;
 @property (nonatomic, copy) NSAttributedString *text;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
 @property (nonatomic, copy) NSArray<UIColor *> *graphColors;
+@property (nonatomic, copy) NSArray<UIColor *> *graphBandColors;
+@property (nonatomic, copy) NSArray<NSNumber *> *graphThresholds;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
