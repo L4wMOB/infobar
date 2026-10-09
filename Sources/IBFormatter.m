@@ -20,6 +20,16 @@ static UIColor *IBLevelColor(IBLevel level, UIColor *fallback) {
 	}
 }
 
+static NSString *IBPct(double v) {
+	if (v < 0) return @"–";
+	NSString *s = [NSString stringWithFormat:@"%.0f%%", v];
+	NSInteger digits = (NSInteger)s.length - 1;
+	NSMutableString *out = [s mutableCopy];
+	for (NSInteger i = digits; i < 3; i++) [out appendString:@"\u2007"];
+	[out appendString:@"\u2060"];
+	return out;
+}
+
 static IBLevel IBLevelAscending(double v, double warn, double high) {
 	if (v < 0) return IBLevelNone;
 	if (v >= high) return IBLevelCritical;
@@ -64,6 +74,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 @property (nonatomic, strong) NSMutableAttributedString *value;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
 @property (nonatomic, copy) NSArray<UIColor *> *graphColors;
+@property (nonatomic, copy) NSArray<UIColor *> *graphBandColors;
+@property (nonatomic, copy) NSArray<NSNumber *> *graphThresholds;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
@@ -124,15 +136,20 @@ static NSString *IBDuration(NSTimeInterval t) {
 	};
 
 	// Attaches a realtime graph to an item. Colors follow the "color-coded" setting.
-	UIColor *(^graphColor)(CGFloat, CGFloat, CGFloat) = ^UIColor *(CGFloat r, CGFloat g, CGFloat b) {
-		return p.colorizeValues ? [UIColor colorWithRed:r green:g blue:b alpha:1] : base;
-	};
-	void (^attachGraph)(IBItem *, NSArray *, NSArray *, double, double, double) = ^(IBItem *item, NSArray *series, NSArray *colors, double min, double max, double minSpan) {
+	// Attaches a realtime graph to an item. The first series is drawn in 3 height
+	// levels (like MSI Afterburner): low / medium / high, same colors and
+	// thresholds as the text values. Without "color-coded" it is a single color.
+	UIColor *goodC = p.colorizeValues ? IBLevelColor(IBLevelGood, base) : base;
+	UIColor *warnC = p.colorizeValues ? IBLevelColor(IBLevelWarn, base) : base;
+	UIColor *critC = p.colorizeValues ? IBLevelColor(IBLevelCritical, base) : base;
+	void (^attachGraph)(IBItem *, NSArray *, NSArray *, double, double, double, double, double, BOOL) = ^(IBItem *item, NSArray *series, NSArray *colors, double min, double max, double minSpan, double t1, double t2, BOOL ascending) {
 		item.graphSeries = series;
 		item.graphColors = colors;
 		item.graphMin = min;
 		item.graphMax = max;
 		item.graphMinSpan = minSpan;
+		item.graphThresholds = @[@(t1), @(t2)];
+		item.graphBandColors = ascending ? @[goodC, warnC, critC] : @[critC, warnC, goodC];
 	};
 
 	if (collapsed) {
@@ -147,12 +164,12 @@ static NSString *IBDuration(NSTimeInterval t) {
 			append(add(@[@"clock"], @""), [cdf stringFromDate:[NSDate date]], IBLevelNone);
 		}
 		if (p.collapsedShowCPU)
-			append(add(@[@"cpu"], @"CPU"), s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
+			append(add(@[@"cpu"], @"CPU"), IBPct(s.cpuUsage), IBLevelAscending(s.cpuUsage, 50, 80));
 		if (p.collapsedShowRAM)
-			append(add(@[@"memorychip"], @"RAM"), s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
+			append(add(@[@"memorychip"], @"RAM"), IBPct(s.ramUsagePercent), IBLevelAscending(s.ramUsagePercent, 65, 85));
 		if (p.collapsedShowBattery) {
 			double pct = s.batteryPercent;
-			append(add(@[s.batteryCharging ? @"battery.100.bolt" : @"battery.75", @"battery.100"], @"BAT"), pct >= 0 ? [NSString stringWithFormat:@"%.0f%%", pct] : @"–", IBLevelDescending(pct, 40, 20));
+			append(add(@[s.batteryCharging ? @"battery.100.bolt" : @"battery.75", @"battery.100"], @"BAT"), IBPct(pct), IBLevelDescending(pct, 40, 20));
 		}
 		if (p.collapsedShowTemp && s.batteryTemperature > -100) {
 			double t = s.batteryTemperature;
@@ -188,8 +205,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 			IBItem *it = add(@[@"cpu"], @"CPU");
 			// A graph on its own still shows the current percentage
 			BOOL cpuPercent = p.showCPU || !p.showCPUFreq;
-			if (cpuPercent) append(it, s.cpuUsage >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.cpuUsage] : @"–", IBLevelAscending(s.cpuUsage, 50, 80));
-			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[graphColor(0.35, 0.85, 1.0)], 0, 100, 100);
+			if (cpuPercent) append(it, IBPct(s.cpuUsage), IBLevelAscending(s.cpuUsage, 50, 80));
+			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[goodC], 0, 100, 100, 50, 80, YES);
 			if (p.showCPUFreq) {
 				if (cpuPercent) append(it, @" ", IBLevelNone);
 				NSString *approx = s.cpuFreqEstimated ? @"~" : @"";
@@ -214,8 +231,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 		if (p.showRAMPercent || p.showRAMGB || p.showRAMGraph) {
 			IBItem *it = add(@[@"memorychip"], @"RAM");
 			BOOL ramPercent = p.showRAMPercent || !p.showRAMGB;
-			if (ramPercent) append(it, s.ramUsagePercent >= 0 ? [NSString stringWithFormat:@"%.0f%%", s.ramUsagePercent] : @"–", IBLevelAscending(s.ramUsagePercent, 65, 85));
-			if (p.showRAMGraph) attachGraph(it, @[[s historyForSeries:IBSeriesRAM]], @[graphColor(0.72, 0.55, 1.0)], 0, 100, 100);
+			if (ramPercent) append(it, IBPct(s.ramUsagePercent), IBLevelAscending(s.ramUsagePercent, 65, 85));
+			if (p.showRAMGraph) attachGraph(it, @[[s historyForSeries:IBSeriesRAM]], @[goodC], 0, 100, 100, 65, 85, YES);
 			if (p.showRAMGB) {
 				if (ramPercent) append(it, @" ", IBLevelNone);
 				append(it, [NSString stringWithFormat:@"%.1f/%.1f GB", s.ramUsed / 1073741824.0, s.ramTotal / 1073741824.0], IBLevelNone);
@@ -232,8 +249,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 			else if (pct >= 13) sym = @"battery.25";
 			else sym = @"battery.0";
 			IBItem *it = add(@[sym, @"battery.100"], @"BAT");
-			append(it, pct >= 0 ? [NSString stringWithFormat:@"%.0f%%", pct] : @"–", IBLevelDescending(pct, 40, 20));
-			if (p.showChargeGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCharge]], @[graphColor(0.35, 0.90, 0.45)], 0, 100, 100);
+			append(it, IBPct(pct), IBLevelDescending(pct, 40, 20));
+			if (p.showChargeGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCharge]], @[goodC], 0, 100, 100, 20, 40, NO);
 			if (list && s.batteryMaxCapacity > 0 && pct >= 0)
 				appendSmall(it, [NSString stringWithFormat:@"  ~%.0f mAh", s.batteryMaxCapacity * pct / 100.0]);
 		}
@@ -243,7 +260,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			double t = s.batteryTemperature;
 			NSString *text = p.useFahrenheit ? [NSString stringWithFormat:@"%.1f°F", t * 9.0 / 5.0 + 32.0] : [NSString stringWithFormat:@"%.1f°C", t];
 			append(it, text, IBLevelAscending(t, 36, 42));
-			if (p.showTempGraph) attachGraph(it, @[[s historyForSeries:IBSeriesTemp]], @[graphColor(1.0, 0.62, 0.20)], NAN, NAN, 4);
+			if (p.showTempGraph) attachGraph(it, @[[s historyForSeries:IBSeriesTemp]], @[goodC], NAN, NAN, 4, 36, 42, YES);
 		}
 
 		if (p.showBatteryPower && s.batteryVoltage > 0) {
@@ -273,14 +290,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 		if ((p.showBatteryCycles || p.showCyclesGraph) && s.batteryCycles >= 0) {
 			IBItem *it = add(@[@"arrow.triangle.2.circlepath"], @"CYC");
 			append(it, [NSString stringWithFormat:@"%ld%@", (long)s.batteryCycles, list ? @" cycles" : @""], IBLevelNone);
-			if (p.showCyclesGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCycles]], @[graphColor(1.0, 0.45, 0.75)], NAN, NAN, 2);
+			if (p.showCyclesGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCycles]], @[goodC], NAN, NAN, 2, 500, 1000, YES);
 		}
 
 		if (p.showNetwork || p.showNetworkGraph) {
 			IBItem *it = add(@[@"arrow.up.arrow.down"], @"NET");
 			append(it, [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
-			UIColor *upColor = p.colorizeValues ? [UIColor colorWithRed:1.0 green:0.62 blue:0.20 alpha:1] : [base colorWithAlphaComponent:0.55];
-			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[graphColor(0.35, 0.85, 1.0), upColor], 0, NAN, 10240);
+			// Download in 3 levels (1 MB/s, 5 MB/s), upload as a thin light line
+			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[goodC, [UIColor colorWithWhite:1 alpha:0.75]], 0, NAN, 10240, 1048576, 5242880, YES);
 		}
 
 		if (p.showIP) {
@@ -333,9 +350,12 @@ static NSString *IBDuration(NSTimeInterval t) {
 		[line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
 
 		IBModule *m = [IBModule new];
+		m.identifier = item.label ?: @"";
 		m.text = line;
 		m.graphSeries = item.graphSeries ?: @[];
 		m.graphColors = item.graphColors ?: @[];
+		m.graphBandColors = item.graphBandColors ?: @[];
+		m.graphThresholds = item.graphThresholds ?: @[];
 		m.graphMin = item.graphSeries ? item.graphMin : NAN;
 		m.graphMax = item.graphSeries ? item.graphMax : NAN;
 		m.graphMinSpan = item.graphMinSpan;
@@ -344,9 +364,12 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 	if (modules.count == 0) {
 		IBModule *m = [IBModule new];
+		m.identifier = @"InfoBar";
 		m.text = [[NSAttributedString alloc] initWithString:@"InfoBar" attributes:labelAttrs];
 		m.graphSeries = @[];
 		m.graphColors = @[];
+		m.graphBandColors = @[];
+		m.graphThresholds = @[];
 		m.graphMin = NAN;
 		m.graphMax = NAN;
 		[modules addObject:m];
