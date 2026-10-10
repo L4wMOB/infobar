@@ -106,6 +106,20 @@
 			<key>defaults</key>
 			<string>com.mathelord.infobar</string>
 			<key>key</key>
+			<string>clickThrough</string>
+			<key>label</key>
+			<string>Click-through when pinned</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
 			<string>showOnLockScreen</string>
 			<key>label</key>
 			<string>Show on lock screen</string>
@@ -518,7 +532,7 @@
 			<key>footerText</key>
 			<string>Makes the background taller above the content. Only the top and bottom grow, the width stays the same.</string>
 			<key>label</key>
-			<string>Background extend - top</string>
+			<string>Background extend top</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -542,7 +556,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>Background extend -bottom</string>
+			<string>Background extend bottom</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -914,7 +928,7 @@
 			<key>key</key>
 			<string>showNetwork</string>
 			<key>label</key>
-			<string>Speed ↓↑</string>
+			<string>Speed ↑↓</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
