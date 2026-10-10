@@ -99,7 +99,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 @property (nonatomic) NSInteger graphUnit;
 @property (nonatomic) double graphValueScale;
 @property (nonatomic) double graphValueOffset;
-@property (nonatomic) BOOL graphOnly; // only the graph, no icon / text
+@property (nonatomic) BOOL graphOnly;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
@@ -393,6 +393,13 @@ static NSString *IBDuration(NSTimeInterval t) {
 	NSDictionary *labelAttrs = @{NSFontAttributeName: font, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.85]};
 	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
 	para.lineBreakMode = NSLineBreakByWordWrapping;
+	NSShadow *textShadow = nil;
+	if (p.shadowStrength > 0.01) {
+		textShadow = [NSShadow new];
+		textShadow.shadowColor = [UIColor colorWithWhite:0 alpha:MIN(1.0, p.shadowStrength)];
+		textShadow.shadowOffset = CGSizeMake(0, 0.6);
+		textShadow.shadowBlurRadius = 1.6;
+	}
 
 	for (IBItem *item in items) {
 		NSMutableAttributedString *line = [NSMutableAttributedString new];
@@ -401,7 +408,6 @@ static NSString *IBDuration(NSTimeInterval t) {
 		if (icon) {
 			NSTextAttachment *att = [NSTextAttachment new];
 			att.image = icon;
-			// Vertically center the symbol on the cap height
 			CGSize size = icon.size;
 			att.bounds = CGRectMake(0, round((font.capHeight - size.height) / 2.0), size.width, size.height);
 			[line appendAttributedString:[NSAttributedString attributedStringWithAttachment:att]];
@@ -419,10 +425,10 @@ static NSString *IBDuration(NSTimeInterval t) {
 				[line appendAttributedString:[[NSAttributedString alloc] initWithString:[item.label stringByAppendingString:@"\u00A0"] attributes:labelAttrs]];
 			}
 		}
-		// Never wrap inside a module, only between modules
 		[item.value.mutableString replaceOccurrencesOfString:@" " withString:@"\u00A0" options:0 range:NSMakeRange(0, item.value.length)];
 		if (!textless) [line appendAttributedString:item.value];
 		if (line.length > 0) [line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
+		if (line.length > 0 && textShadow) [line addAttribute:NSShadowAttributeName value:textShadow range:NSMakeRange(0, line.length)];
 
 		IBModule *m = [IBModule new];
 		m.identifier = item.label ?: @"";
