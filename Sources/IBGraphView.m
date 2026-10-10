@@ -82,8 +82,8 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	if ((self = [super initWithFrame:frame])) {
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
-		self.clipsToBounds = YES;
-		self.userInteractionEnabled = NO;
+		self.clipsToBounds = YES; // the plot is wider than the graph while it slides
+		self.userInteractionEnabled = NO; // touches go to the bar (drag, double tap)
 		self.contentMode = UIViewContentModeRedraw;
 		_series = @[];
 		_colors = @[];
@@ -148,6 +148,8 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 - (void)setShadowStrength:(double)shadowStrength {
 	if (fabs(shadowStrength - _shadowStrength) < 0.001) return;
 	_shadowStrength = shadowStrength;
+	_frameView.layer.shadowOpacity = (float)MIN(1.0, shadowStrength);
+	[self setNeedsDisplay];
 	[_plot setNeedsDisplay];
 }
 
@@ -174,7 +176,6 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 		} else {
 			double span = MAX(hi - lo, 1e-9);
 			if (fabs(lo - _curLo) < span * 0.03 && fabs(hi - _curHi) < span * 0.03) {
-				// Small change: no need to animate the scale
 				_curLo = lo;
 				_curHi = hi;
 			} else {
@@ -255,6 +256,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	}];
 }
 
+// Sets a number; a changed number cross-dissolves into the new one
 - (void)setText:(NSString *)text onLabel:(IBShadowLabel *)label {
 	if ([label.attributedText.string isEqualToString:text]) return;
 	NSAttributedString *attributed = [self numberString:text];
@@ -286,6 +288,13 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	CGFloat margin = step + 3;
 	_plot.frame = CGRectMake(-margin, 0, W + 2 * margin, H);
 	_frameView.frame = self.bounds;
+	CGPathRef outline = CGPathCreateCopyByStrokingPath([UIBezierPath bezierPathWithRect:self.bounds].CGPath, NULL, 0.5, kCGLineCapButt, kCGLineJoinMiter, 10);
+	_frameView.layer.shadowPath = outline;
+	CGPathRelease(outline);
+	_frameView.layer.shadowColor = [UIColor blackColor].CGColor;
+	_frameView.layer.shadowOpacity = (float)MIN(1.0, _shadowStrength);
+	_frameView.layer.shadowRadius = 1.5;
+	_frameView.layer.shadowOffset = CGSizeMake(0, 0.5);
 	if (!CGSizeEqualToSize(_laidOutSize, self.bounds.size)) {
 		_laidOutSize = self.bounds.size;
 		[_plot setNeedsDisplay];
@@ -305,6 +314,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 #pragma mark Range
 
+// Value range of the data (with headroom), before easing
 - (BOOL)targetRangeLo:(double *)outLo hi:(double *)outHi {
 	double lo = INFINITY, hi = -INFINITY;
 	for (NSArray<NSNumber *> *s in _series) {
@@ -327,7 +337,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 			hi = mid + _minSpan / 2;
 		}
 	}
-	double pad = (hi - lo) * 0.08;
+	double pad = (hi - lo) * 0.08; // headroom for automatic edges
 	if (!fixedLo) lo -= pad;
 	if (!fixedHi) hi += pad;
 	*outLo = lo;
@@ -345,6 +355,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	CGFloat step = W / (IB_HISTORY_COUNT - 1);
 	CGContextSetLineWidth(ctx, 0.5);
 	CGContextSetStrokeColorWithColor(ctx, [UIColor colorWithWhite:1 alpha:0.13].CGColor);
+	CGContextSetShadowWithColor(ctx, CGSizeMake(0, 0.5), 1.5, [UIColor colorWithWhite:0 alpha:MIN(1.0, _shadowStrength)].CGColor);
 	for (int i = 1; i < 4; i++) {
 		CGFloat y = round(H * i / 4.0) + 0.25;
 		CGContextMoveToPoint(ctx, 0, y);
@@ -380,8 +391,19 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 	void (^strokeWithShadow)(UIBezierPath *) = ^(UIBezierPath *path) {
 		CGContextSaveGState(ctx);
-		CGContextSetShadowWithColor(ctx, CGSizeMake(0, 1), 2, shadowColor.CGColor);
+		NSShadow *shadow = [NSShadow new];
+		shadow.shadowColor = shadowColor;
+		shadow.shadowOffset = CGSizeMake(0, 1);
+		shadow.shadowBlurRadius = 2;
+		[shadow set];
 		[path stroke];
+		CGContextRestoreGState(ctx);
+	};
+
+	void (^fillWithShadow)(UIBezierPath *) = ^(UIBezierPath *path) {
+		CGContextSaveGState(ctx);
+		CGContextSetShadowWithColor(ctx, CGSizeMake(0, 1), 2, shadowColor.CGColor);
+		[path fill];
 		CGContextRestoreGState(ctx);
 	};
 
@@ -412,6 +434,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 				if (banded) {
 					CGFloat yLow = yFor(_bandThresholds[0].doubleValue);
 					CGFloat yHigh = yFor(_bandThresholds[1].doubleValue);
+					// Bands from the bottom: low, medium, high (each reaches both edges)
 					CGRect rects[3] = {
 						CGRectMake(-M, yLow, W + 2 * M, H + 2 - yLow),
 						CGRectMake(-M, yHigh, W + 2 * M, yLow - yHigh),
@@ -422,14 +445,14 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 						CGContextSaveGState(ctx);
 						CGContextClipToRect(ctx, rects[k]);
 						[[_bandColors[k] colorWithAlphaComponent:0.30] setFill];
-						[fill fill];
+						fillWithShadow(fill);
 						[_bandColors[k] setStroke];
 						strokeWithShadow(line);
 						CGContextRestoreGState(ctx);
 					}
 				} else {
 					[[plain colorWithAlphaComponent:0.25] setFill];
-					[fill fill];
+					fillWithShadow(fill);
 					[plain setStroke];
 					strokeWithShadow(line);
 				}
@@ -441,6 +464,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 		seriesIndex++;
 	}
 
+	// Thin boundary lines over the whole width where yellow and red begin
 	if (banded && _thresholdColors.count == 2) {
 		CGContextSetLineWidth(ctx, 0.5);
 		for (int k = 0; k < 2; k++) {
