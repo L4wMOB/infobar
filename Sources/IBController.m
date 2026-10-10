@@ -61,6 +61,7 @@ static const CGFloat kMargin = 4;
 	[self createWindow];
 	[_bar applyPrefs:_prefs];
 	[self updateTouchThrough];
+	// Prime the stats so rates (CPU, network) are correct on the first tick
 	dispatch_async(_queue, ^{ [[IBStats sharedInstance] refresh]; });
 	[self updateVisibility];
 	[self tick];
@@ -104,6 +105,7 @@ static const CGFloat kMargin = 4;
 	CGSize size = _viewController.view.bounds.size;
 	if (CGSizeEqualToSize(size, _lastContainerSize)) return;
 	_lastContainerSize = size;
+	// Re-apply the relative saved position after rotation / resize
 	[self layoutBarFromPrefs:YES];
 }
 
@@ -158,9 +160,11 @@ static const CGFloat kMargin = 4;
 #pragma mark Preferences & visibility
 
 - (void)updateTouchThrough {
-	_window.touchThrough = _prefs.pinned && _prefs.clickThrough;
+	BOOL hasButtons = _prefs.showPinButton || _prefs.showCollapseButton || _prefs.collapsed;
+	_window.touchThrough = _prefs.clickThrough && hasButtons;
 }
 
+// Double tap seen by the window while taps pass through the bar
 - (void)windowDidDoubleTap {
 	if (_prefs.doubleTapTogglesLayout && _window.touchThrough) [self barViewDidDoubleTap:_bar];
 }
