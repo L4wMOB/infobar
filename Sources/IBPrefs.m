@@ -60,6 +60,7 @@ static UIColor *IBColorNamed(NSString *name) {
 		_showPinButton = IBBool(d, @"showPinButton", YES);
 		_showOnLockScreen = IBBool(d, @"showOnLockScreen", YES);
 		_hideInLandscape = IBBool(d, @"hideInLandscape", NO);
+		_clickThrough = IBBool(d, @"clickThrough", YES);
 		_doubleTapTogglesLayout = IBBool(d, @"doubleTapTogglesLayout", YES);
 		_collapsed = IBBool(d, @"collapsed", NO);
 		_showCollapseButton = IBBool(d, @"showCollapseButton", YES);
