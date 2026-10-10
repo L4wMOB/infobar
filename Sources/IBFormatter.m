@@ -223,7 +223,6 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if (p.showCPU || p.showCPUFreq || p.showCPUGraph) {
 			IBItem *it = add(@[@"cpu"], @"CPU");
-			// A graph on its own still shows the current percentage
 			BOOL cpuPercent = p.showCPU || !p.showCPUFreq;
 			if (cpuPercent) append(it, IBPct(s.cpuUsage), IBLevelAscending(s.cpuUsage, 50, 80));
 			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[goodC], 0, 100, 100, 50, 80, YES, IBGraphUnitPercent);
@@ -317,7 +316,6 @@ static NSString *IBDuration(NSTimeInterval t) {
 		if (p.showNetwork || p.showNetworkGraph) {
 			IBItem *it = add(@[@"arrow.up.arrow.down"], @"NET");
 			append(it, [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
-			// Download in 3 levels (1 MB/s, 5 MB/s), upload as a thin light line
 			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[goodC, [UIColor colorWithWhite:1 alpha:0.75]], 0, NAN, 10240, 1048576, 5242880, YES, IBGraphUnitBytesPerSec);
 		}
 
@@ -346,9 +344,47 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 	// Assemble
 	NSMutableArray<IBModule *> *modules = [NSMutableArray array];
+	NSMutableString *cfg = [NSMutableString string];
+	[cfg appendString:p.collapsed ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowTime ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowCPU ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowRAM ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowBattery ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowTemp ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowNetwork ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowStorage ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowUptime ? @"1" : @"0"];
+	[cfg appendString:p.collapsedShowThermal ? @"1" : @"0"];
+	[cfg appendString:p.useIcons ? @"1" : @"0"];
+	[cfg appendString:p.useFahrenheit ? @"1" : @"0"];
+	[cfg appendString:p.showTime ? @"1" : @"0"];
+	[cfg appendString:p.showCPU ? @"1" : @"0"];
+	[cfg appendString:p.showCPUFreq ? @"1" : @"0"];
+	[cfg appendString:p.showCPUInfo ? @"1" : @"0"];
+	[cfg appendString:p.showRAMPercent ? @"1" : @"0"];
+	[cfg appendString:p.showRAMGB ? @"1" : @"0"];
+	[cfg appendString:p.showBattery ? @"1" : @"0"];
+	[cfg appendString:p.showBatteryTemp ? @"1" : @"0"];
+	[cfg appendString:p.showBatteryPower ? @"1" : @"0"];
+	[cfg appendString:p.showBatteryVoltage ? @"1" : @"0"];
+	[cfg appendString:p.showCharger ? @"1" : @"0"];
+	[cfg appendString:p.showBatteryHealth ? @"1" : @"0"];
+	[cfg appendString:p.showBatteryCycles ? @"1" : @"0"];
+	[cfg appendString:p.showNetwork ? @"1" : @"0"];
+	[cfg appendString:p.showIP ? @"1" : @"0"];
+	[cfg appendString:p.showStorage ? @"1" : @"0"];
+	[cfg appendString:p.showUptime ? @"1" : @"0"];
+	[cfg appendString:p.showThermal ? @"1" : @"0"];
+	[cfg appendString:p.showCPUGraph ? @"1" : @"0"];
+	[cfg appendString:p.showRAMGraph ? @"1" : @"0"];
+	[cfg appendString:p.showChargeGraph ? @"1" : @"0"];
+	[cfg appendString:p.showTempGraph ? @"1" : @"0"];
+	[cfg appendString:p.showCyclesGraph ? @"1" : @"0"];
+	[cfg appendString:p.showNetworkGraph ? @"1" : @"0"];
+	[cfg appendFormat:@"%ld%ld", (long)p.layout, (long)p.collapsedMode];
+
 	NSDictionary *labelAttrs = @{NSFontAttributeName: font, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.85]};
 	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
-	// If a module doesn't fit on screen, wrap inside it
 	para.lineBreakMode = NSLineBreakByWordWrapping;
 
 	for (IBItem *item in items) {
@@ -381,6 +417,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		IBModule *m = [IBModule new];
 		m.identifier = item.label ?: @"";
+		m.configKey = cfg;
 		m.text = line;
 		m.graphSeries = item.graphSeries ?: @[];
 		m.graphColors = item.graphColors ?: @[];
@@ -399,6 +436,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 	if (modules.count == 0) {
 		IBModule *m = [IBModule new];
 		m.identifier = @"InfoBar";
+		m.configKey = cfg;
 		m.text = [[NSAttributedString alloc] initWithString:@"InfoBar" attributes:labelAttrs];
 		m.graphSeries = @[];
 		m.graphColors = @[];
