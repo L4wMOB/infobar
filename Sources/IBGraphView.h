@@ -13,6 +13,7 @@ typedef NS_ENUM(NSInteger, IBGraphUnit) {
 @property (nonatomic) IBGraphUnit unit;
 @property (nonatomic) double valueScale;
 @property (nonatomic) double valueOffset;
+@property (nonatomic) double scrollDuration;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *series;
 @property (nonatomic, copy) NSArray<UIColor *> *colors;
 @property (nonatomic, copy) NSArray<UIColor *> *bandColors;
