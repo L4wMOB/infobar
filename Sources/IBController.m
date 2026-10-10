@@ -60,6 +60,7 @@ static const CGFloat kMargin = 4;
 
 	[self createWindow];
 	[_bar applyPrefs:_prefs];
+	[self updateTouchThrough];
 	// Prime the stats so rates (CPU, network) are correct on the first tick
 	dispatch_async(_queue, ^{ [[IBStats sharedInstance] refresh]; });
 	[self updateVisibility];
@@ -92,6 +93,8 @@ static const CGFloat kMargin = 4;
 	_viewController.layoutHandler = ^{ [weakSelf containerDidLayout]; };
 	_window.rootViewController = _viewController;
 
+	_window.doubleTapHandler = ^{ [weakSelf windowDidDoubleTap]; };
+
 	_bar = [[IBBarView alloc] initWithFrame:CGRectZero];
 	_bar.delegate = self;
 	[_viewController.view addSubview:_bar];
@@ -106,8 +109,6 @@ static const CGFloat kMargin = 4;
 	[self layoutBarFromPrefs:YES];
 }
 
-// Positions the bar. With fromPrefs = NO the nearest edge stays put so the
-// bar doesn't jump around when it grows or shrinks.
 - (void)layoutBarFromPrefs:(BOOL)fromPrefs {
 	UIView *container = _viewController.view;
 	CGRect cb = container.bounds;
@@ -135,8 +136,6 @@ static const CGFloat kMargin = 4;
 		if (oc.x < W / 3) center.x = oc.x - os.width / 2 + size.width / 2;
 		else if (oc.x > W * 2 / 3) center.x = oc.x + os.width / 2 - size.width / 2;
 		else center.x = oc.x;
-		// Changing the top / bottom background extension must not move the content:
-		// the edge that is anchored stays, the other one grows.
 		CGFloat dTop = _prefs.bgExtendTop - _appliedExtraTop;
 		CGFloat dBottom = _prefs.bgExtendBottom - _appliedExtraBottom;
 		if (oc.y > H * 2 / 3) center.y = oc.y + os.height / 2 - size.height / 2 + dBottom;
@@ -160,10 +159,21 @@ static const CGFloat kMargin = 4;
 
 #pragma mark Preferences & visibility
 
+// While pinned the bar can't be dragged, so taps may go straight through it
+- (void)updateTouchThrough {
+	_window.touchThrough = _prefs.pinned && _prefs.clickThrough;
+}
+
+// Double tap seen by the window while taps pass through the bar
+- (void)windowDidDoubleTap {
+	if (_prefs.doubleTapTogglesLayout && _window.touchThrough) [self barViewDidDoubleTap:_bar];
+}
+
 - (void)reloadPrefs {
 	double oldInterval = _prefs.updateInterval;
 	_prefs = [IBPrefs load];
 	[_bar applyPrefs:_prefs];
+	[self updateTouchThrough];
 	if (_timer && fabs(oldInterval - _prefs.updateInterval) > 0.01) {
 		[_timer invalidate];
 		_timer = nil;
@@ -229,6 +239,12 @@ static const CGFloat kMargin = 4;
 					[self layoutBarFromPrefs:NO];
 					[self->_bar layoutIfNeeded];
 				} completion:nil];
+			} else if (self->_placed) {
+				// Size changes (value or graph switched on / off, longer text) glide
+				[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionCurveEaseInOut animations:^{
+					[self layoutBarFromPrefs:NO];
+					[self->_bar layoutIfNeeded];
+				} completion:nil];
 			} else {
 				[self layoutBarFromPrefs:NO];
 			}
@@ -246,6 +262,7 @@ static const CGFloat kMargin = 4;
 - (void)barViewDidTogglePin:(IBBarView *)bar {
 	[IBPrefs setValue:@(bar.pinned) forKey:@"pinned"];
 	_prefs = [IBPrefs load];
+	[self updateTouchThrough];
 }
 
 - (void)barViewDidFinishDragging:(IBBarView *)bar {
