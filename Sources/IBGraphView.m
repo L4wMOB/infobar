@@ -391,11 +391,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 	void (^strokeWithShadow)(UIBezierPath *) = ^(UIBezierPath *path) {
 		CGContextSaveGState(ctx);
-		NSShadow *shadow = [NSShadow new];
-		shadow.shadowColor = shadowColor;
-		shadow.shadowOffset = CGSizeMake(0, 1);
-		shadow.shadowBlurRadius = 2;
-		[shadow set];
+		CGContextSetShadowWithColor(ctx, CGSizeMake(0, 1), 2, shadowColor.CGColor);
 		[path stroke];
 		CGContextRestoreGState(ctx);
 	};
