@@ -5,6 +5,8 @@ NS_ASSUME_NONNULL_BEGIN
 // Full-screen window above everything else that passes touches outside the
 // bar through to whatever is underneath.
 @interface IBOverlayWindow : UIWindow
+@property (nonatomic) BOOL touchThrough;
+@property (nonatomic, copy, nullable) void (^doubleTapHandler)(void);
 @end
 
 // Root view controller that reports size changes (rotation).
