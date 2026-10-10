@@ -4,6 +4,7 @@
 #import "IBGraphView.h"
 
 static const CGFloat kPadH = 8;
+static const CGFloat kShadowReach = 10;
 static const CGFloat kPadV = 5;
 static const CGFloat kPadTop = 3.5;
 static const CGFloat kPinSize = 20;
@@ -17,7 +18,7 @@ static const CGFloat kMinGraphWidth = 44;
 @interface IBCellView : UIView
 @property (nonatomic, readonly) IBShadowLabel *label;
 @property (nonatomic, readonly) IBGraphView *graph;
-@property (nonatomic) BOOL justShown;
+@property (nonatomic) BOOL justShown;       // place without animating
 @property (nonatomic) BOOL graphJustShown;
 @end
 
@@ -43,6 +44,9 @@ static const CGFloat kMinGraphWidth = 44;
 #pragma mark - Bar
 
 @implementation IBBarView {
+	UIImageView *_shadowView;
+	NSString *_shadowImageKey;
+	CGFloat _cornerRadius, _bgAlpha;
 	UIVisualEffectView *_blurView;
 	UIView *_tintView;
 	UIButton *_pinButton;
@@ -74,8 +78,9 @@ static const CGFloat kMinGraphWidth = 44;
 
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
-		self.clipsToBounds = YES;
-		self.layer.cornerCurve = kCACornerCurveContinuous;
+		self.clipsToBounds = NO;
+		_cornerRadius = 12;
+		_bgAlpha = 0.5;
 
 		_cells = [NSMutableArray array];
 		_modules = @[];
@@ -89,6 +94,10 @@ static const CGFloat kMinGraphWidth = 44;
 		_stickyWidths = [NSMutableDictionary dictionary];
 		_stickyShapes = [NSMutableDictionary dictionary];
 		_moduleSignature = @"";
+
+		_shadowView = [UIImageView new];
+		_shadowView.userInteractionEnabled = NO;
+		[self addSubview:_shadowView];
 
 		_blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
 		_blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -159,9 +168,44 @@ static const CGFloat kMinGraphWidth = 44;
 	_blurView.hidden = !blur;
 	// With blur, a lighter tint gives the same perceived opacity
 	_tintView.alpha = blur ? prefs.backgroundAlpha * 0.6 : prefs.backgroundAlpha;
-	self.layer.cornerRadius = prefs.cornerRadius;
+	_cornerRadius = prefs.cornerRadius;
+	_bgAlpha = prefs.backgroundAlpha;
+	for (UIView *v in @[_blurView, _tintView]) {
+		v.clipsToBounds = YES;
+		v.layer.cornerRadius = _cornerRadius;
+		v.layer.cornerCurve = kCACornerCurveContinuous;
+	}
+	[self updateBackgroundShadow];
 	self.pinned = prefs.pinned;
 	[self setNeedsLayout];
+}
+
+- (void)updateBackgroundShadow {
+	CGFloat r = _cornerRadius;
+	NSString *key = [NSString stringWithFormat:@"%.1f|%.1f", r, [UIScreen mainScreen].scale];
+	if (![key isEqualToString:_shadowImageKey]) {
+		_shadowImageKey = key;
+		CGFloat cap = kShadowReach + MAX(r, 1);
+		CGFloat side = 2 * cap + 2;
+		UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
+		format.opaque = NO;
+		UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side) format:format];
+		UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *rc) {
+			CGContextRef ctx = rc.CGContext;
+			CGRect inner = CGRectInset(CGRectMake(0, 0, side, side), kShadowReach, kShadowReach);
+			UIBezierPath *shape = [UIBezierPath bezierPathWithRoundedRect:inner cornerRadius:r];
+			CGContextSaveGState(ctx);
+			CGContextSetShadowWithColor(ctx, CGSizeMake(0, 2), 7, [UIColor colorWithWhite:0 alpha:0.65].CGColor);
+			[[UIColor blackColor] setFill];
+			[shape fill];
+			CGContextRestoreGState(ctx);
+			CGContextSetBlendMode(ctx, kCGBlendModeClear);
+			[shape fill];
+		}];
+		_shadowView.image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(cap, cap, cap, cap) resizingMode:UIImageResizingModeStretch];
+	}
+	_shadowView.alpha = MIN(1.0, _shadowStrength) * MIN(1.0, _bgAlpha * 2);
+	_shadowView.hidden = _shadowView.alpha < 0.01;
 }
 
 - (void)setPinned:(BOOL)pinned {
@@ -195,7 +239,7 @@ static const CGFloat kMinGraphWidth = 44;
 	for (IBModule *m in _modules) [signature appendFormat:@"%@|", m.identifier ?: @""];
 	if (![signature isEqualToString:_moduleSignature]) {
 		_moduleSignature = [signature copy];
-		[_stickyWidths removeAllObjects];
+		[_stickyWidths removeAllObjects]; // modules added / removed: size from scratch
 		[_stickyShapes removeAllObjects];
 	}
 	while (_cells.count < _modules.count) {
@@ -260,7 +304,7 @@ static const CGFloat kMinGraphWidth = 44;
 			g.valueOffset = m.graphValueOffset;
 			g.scrollDuration = _updateInterval;
 			g.shadowStrength = _shadowStrength;
-			g.series = m.graphSeries;
+			g.series = m.graphSeries; // redraws / scrolls
 		} else if (!g.hidden) {
 			[UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ g.alpha = 0; } completion:^(BOOL finished) {
 				if (![self hasGraphAtIndex:i]) {
@@ -352,7 +396,7 @@ static CGFloat IBTopGap(IBModule *m) {
 		CGFloat cw = ls.width;
 		if (hasGraph) {
 			if (list) cw = listGraphW;
-			else if (graphOnly) cw = MIN(MAX(_graphWidth, kMinGraphWidth), availW);
+			else if (graphOnly) cw = MIN(MAX(_graphWidth, kMinGraphWidth), availW); // width from the slider
 			else cw = MIN(MAX(ls.width, kMinGraphWidth), availW);
 		}
 		CGFloat ch = hasGraph ? textH + gap + gh : textH;
@@ -385,6 +429,7 @@ static CGFloat IBTopGap(IBModule *m) {
 
 	CGFloat W = MIN(contentX + contentW + rightPad, maxWidth);
 	CGFloat H = MAX(contentH + topPad + botPad, minH);
+	// Center the content between the paddings (the buttons can make the bar taller)
 	CGFloat offsetY = topPad + MAX(0, (H - topPad - botPad - contentH) / 2);
 	for (NSUInteger i = 0; i < n; i++) {
 		CGRect c = _cellFrames[i].CGRectValue;
@@ -405,6 +450,7 @@ static CGFloat IBTopGap(IBModule *m) {
 	CGRect b = self.bounds;
 	_blurView.frame = b;
 	_tintView.frame = b;
+	_shadowView.frame = CGRectInset(b, -kShadowReach, -kShadowReach);
 
 	if (_cellFrames.count != _modules.count) [self computeLayoutForMaxWidth:b.size.width];
 
