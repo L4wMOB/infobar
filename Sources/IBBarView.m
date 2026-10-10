@@ -5,6 +5,7 @@
 
 static const CGFloat kPadH = 8;
 static const CGFloat kPadV = 5;
+static const CGFloat kPadTop = 3.5;
 static const CGFloat kPinSize = 20;
 static const CGFloat kCellGapH = 12;
 static const CGFloat kLineGapRow = 4;
@@ -14,7 +15,7 @@ static const CGFloat kMinGraphWidth = 44;
 #pragma mark - Cell (one module: text + optional graph)
 
 @interface IBCellView : UIView
-@property (nonatomic, readonly) UILabel *label;
+@property (nonatomic, readonly) IBShadowLabel *label;
 @property (nonatomic, readonly) IBGraphView *graph;
 @property (nonatomic) BOOL justShown;
 @property (nonatomic) BOOL graphJustShown;
@@ -25,7 +26,7 @@ static const CGFloat kMinGraphWidth = 44;
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
 		self.userInteractionEnabled = NO;
-		_label = [UILabel new];
+		_label = [IBShadowLabel new];
 		_label.numberOfLines = 0;
 		_label.lineBreakMode = NSLineBreakByWordWrapping;
 		_label.userInteractionEnabled = NO;
@@ -149,7 +150,6 @@ static const CGFloat kMinGraphWidth = 44;
 
 	_shadowStrength = prefs.shadowStrength;
 	_updateInterval = prefs.updateInterval;
-	for (IBCellView *cell in _cells) [self applyShadowToCell:cell];
 	_graphHeight = prefs.graphHeight;
 	_graphWidth = prefs.graphWidth;
 	_extraTop = prefs.bgExtendTop;
@@ -195,13 +195,12 @@ static const CGFloat kMinGraphWidth = 44;
 	for (IBModule *m in _modules) [signature appendFormat:@"%@|", m.identifier ?: @""];
 	if (![signature isEqualToString:_moduleSignature]) {
 		_moduleSignature = [signature copy];
-		[_stickyWidths removeAllObjects]; // modules added / removed: size from scratch
+		[_stickyWidths removeAllObjects];
 		[_stickyShapes removeAllObjects];
 	}
 	while (_cells.count < _modules.count) {
 		IBCellView *cell = [IBCellView new];
 		cell.hidden = YES;
-		[self applyShadowToCell:cell];
 		[self insertSubview:cell belowSubview:_pinButton];
 		[_cells addObject:cell];
 	}
@@ -260,7 +259,8 @@ static const CGFloat kMinGraphWidth = 44;
 			g.valueScale = m.graphValueScale;
 			g.valueOffset = m.graphValueOffset;
 			g.scrollDuration = _updateInterval;
-			g.series = m.graphSeries; // redraws / scrolls
+			g.shadowStrength = _shadowStrength;
+			g.series = m.graphSeries;
 		} else if (!g.hidden) {
 			[UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ g.alpha = 0; } completion:^(BOOL finished) {
 				if (![self hasGraphAtIndex:i]) {
@@ -271,22 +271,6 @@ static const CGFloat kMinGraphWidth = 44;
 		}
 	}
 	[self setNeedsLayout];
-}
-
-- (void)applyShadowToCell:(IBCellView *)cell {
-	CGFloat s = MIN(MAX(_shadowStrength, 0), 1);
-	CALayer *layer = cell.layer;
-	layer.masksToBounds = NO;
-	layer.shadowColor = [UIColor blackColor].CGColor;
-	layer.shadowOpacity = (float)s;
-	layer.shadowRadius = 3.5;
-	layer.shadowOffset = CGSizeMake(0, 1);
-	CALayer *text = cell.label.layer;
-	text.masksToBounds = NO;
-	text.shadowColor = [UIColor blackColor].CGColor;
-	text.shadowOpacity = (float)MIN(1.0, s * 1.25);
-	text.shadowRadius = 1.4;
-	text.shadowOffset = CGSizeMake(0, 0.75);
 }
 
 static CGFloat IBTopGap(IBModule *m) {
@@ -314,7 +298,7 @@ static CGFloat IBTopGap(IBModule *m) {
 
 	NSUInteger nButtons = [self visibleButtons].count;
 	BOOL list = _layout == IBLayoutList;
-	CGFloat topPad = kPadV + _extraTop, botPad = kPadV + _extraBottom;
+	CGFloat topPad = kPadTop + _extraTop, botPad = kPadV + _extraBottom;
 	CGFloat minH = nButtons == 0 ? 0 : (list ? nButtons * kPinSize + 6 : kPinSize + 4);
 	minH += _extraTop + _extraBottom;
 
@@ -338,7 +322,7 @@ static CGFloat IBTopGap(IBModule *m) {
 	CGFloat graphColumnW = 0;
 	for (NSUInteger i = 0; i < n; i++) {
 		BOOL textless = _modules[i].text.length == 0;
-		CGSize ls = textless ? CGSizeZero : [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
+		CGSize ls = textless ? CGSizeZero : [_cells[i].label fittingTextSizeForWidth:availW];
 		NSString *key = [NSString stringWithFormat:@"%lu-%@", (unsigned long)i, _modules[i].identifier ?: @""];
 		NSString *shape = _modules[i].configKey ?: @"";
 		if (![_stickyShapes[key] isEqualToString:shape]) {
@@ -362,14 +346,13 @@ static CGFloat IBTopGap(IBModule *m) {
 		BOOL hasGraph = [self hasGraphAtIndex:i];
 		CGSize ls = labelSizes[i];
 		CGFloat topGap = IBTopGap(_modules[i]);
-		CGFloat textH = ls.height - topGap; // the text starts right at the top of its row
-		// In both layouts the graph sits right below its value
+		CGFloat textH = ls.height - topGap;
 		BOOL graphOnly = hasGraph && ls.width <= 0;
 		CGFloat gap = textH > 0 ? kGraphGapBelow : 0;
 		CGFloat cw = ls.width;
 		if (hasGraph) {
 			if (list) cw = listGraphW;
-			else if (graphOnly) cw = MIN(MAX(_graphWidth, kMinGraphWidth), availW); // width from the slider
+			else if (graphOnly) cw = MIN(MAX(_graphWidth, kMinGraphWidth), availW);
 			else cw = MIN(MAX(ls.width, kMinGraphWidth), availW);
 		}
 		CGFloat ch = hasGraph ? textH + gap + gh : textH;
@@ -402,7 +385,6 @@ static CGFloat IBTopGap(IBModule *m) {
 
 	CGFloat W = MIN(contentX + contentW + rightPad, maxWidth);
 	CGFloat H = MAX(contentH + topPad + botPad, minH);
-	// Center the content between the paddings (the buttons can make the bar taller)
 	CGFloat offsetY = topPad + MAX(0, (H - topPad - botPad - contentH) / 2);
 	for (NSUInteger i = 0; i < n; i++) {
 		CGRect c = _cellFrames[i].CGRectValue;
@@ -429,7 +411,6 @@ static CGFloat IBTopGap(IBModule *m) {
 	NSArray<UIButton *> *buttons = [self visibleButtons];
 	CGFloat contentTop = _extraTop, contentBottom = b.size.height - _extraBottom;
 	for (NSUInteger i = 0; i < buttons.count; i++) {
-		// bounds + center instead of frame since the pin may be rotated
 		buttons[i].bounds = CGRectMake(0, 0, kPinSize, kPinSize);
 		if (_layout == IBLayoutList)
 			buttons[i].center = CGPointMake(b.size.width - 3 - kPinSize / 2, contentTop + 3 + kPinSize / 2 + i * kPinSize);
@@ -446,12 +427,12 @@ static CGFloat IBTopGap(IBModule *m) {
 			// A new module is placed directly, only its opacity animates
 			[UIView performWithoutAnimation:^{
 				cell.frame = cellFrame;
-				cell.label.frame = labelFrame;
+				[cell.label setTextFrame:labelFrame];
 			}];
 			cell.justShown = NO;
 		} else {
 			cell.frame = cellFrame;
-			cell.label.frame = labelFrame;
+			[cell.label setTextFrame:labelFrame];
 		}
 		if ([self hasGraphAtIndex:i]) {
 			CGRect graphFrame = _graphFrames[i].CGRectValue;
