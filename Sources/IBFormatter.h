@@ -5,6 +5,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface IBModule : NSObject
+@property (nonatomic, copy) NSString *configKey;
 @property (nonatomic, copy) NSString *identifier;
 @property (nonatomic, copy) NSAttributedString *text;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
