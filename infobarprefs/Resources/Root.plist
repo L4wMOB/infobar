@@ -108,7 +108,7 @@
 			<key>key</key>
 			<string>clickThrough</string>
 			<key>label</key>
-			<string>Click-through when pinned</string>
+			<string>Click-through (move bar with its buttons)</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
