@@ -61,7 +61,6 @@ static const CGFloat kMargin = 4;
 	[self createWindow];
 	[_bar applyPrefs:_prefs];
 	[self updateTouchThrough];
-	// Prime the stats so rates (CPU, network) are correct on the first tick
 	dispatch_async(_queue, ^{ [[IBStats sharedInstance] refresh]; });
 	[self updateVisibility];
 	[self tick];
@@ -105,7 +104,6 @@ static const CGFloat kMargin = 4;
 	CGSize size = _viewController.view.bounds.size;
 	if (CGSizeEqualToSize(size, _lastContainerSize)) return;
 	_lastContainerSize = size;
-	// Re-apply the relative saved position after rotation / resize
 	[self layoutBarFromPrefs:YES];
 }
 
@@ -159,12 +157,10 @@ static const CGFloat kMargin = 4;
 
 #pragma mark Preferences & visibility
 
-// While pinned the bar can't be dragged, so taps may go straight through it
 - (void)updateTouchThrough {
 	_window.touchThrough = _prefs.pinned && _prefs.clickThrough;
 }
 
-// Double tap seen by the window while taps pass through the bar
 - (void)windowDidDoubleTap {
 	if (_prefs.doubleTapTogglesLayout && _window.touchThrough) [self barViewDidDoubleTap:_bar];
 }
@@ -206,7 +202,7 @@ static const CGFloat kMargin = 4;
 	if (active && !_timer) {
 		__weak typeof(self) weakSelf = self;
 		_timer = [NSTimer timerWithTimeInterval:_prefs.updateInterval repeats:YES block:^(NSTimer *t) { [weakSelf tick]; }];
-		_timer.tolerance = _prefs.updateInterval * 0.1;
+		_timer.tolerance = _prefs.updateInterval * 0.2; // lets the system batch wake-ups
 		[[NSRunLoop mainRunLoop] addTimer:_timer forMode:NSRunLoopCommonModes];
 	} else if (!active && _timer) {
 		// Screen off / disabled: don't measure anything, saves battery
@@ -227,6 +223,19 @@ static const CGFloat kMargin = 4;
 	dispatch_async(_queue, ^{
 		IBStats *stats = [IBStats sharedInstance];
 		stats.measureCPUFrequency = prefs.showCPUFreq && !prefs.collapsed;
+		// Only read what is shown: every reading costs battery
+		BOOL buttonsOnly = prefs.collapsed && prefs.collapsedMode == IBCollapsedModeButtons;
+		BOOL full = !prefs.collapsed;
+		stats.measureCPU = !buttonsOnly && (full ? (prefs.showCPU || prefs.showCPUGraph) : prefs.collapsedShowCPU);
+		stats.measureMemory = !buttonsOnly && (full ? (prefs.showRAMPercent || prefs.showRAMGB || prefs.showRAMGraph) : prefs.collapsedShowRAM);
+		stats.measureBattery = !buttonsOnly && (full
+			? (prefs.showBattery || prefs.showChargeGraph || prefs.showBatteryTemp || prefs.showTempGraph || prefs.showBatteryPower || prefs.showBatteryVoltage
+			   || prefs.showCharger || prefs.showBatteryHealth || prefs.showBatteryCycles || prefs.showCyclesGraph)
+			: (prefs.collapsedShowBattery || prefs.collapsedShowTemp));
+		stats.measureNetwork = !buttonsOnly && (full ? (prefs.showNetwork || prefs.showNetworkGraph) : prefs.collapsedShowNetwork);
+		stats.measureSystem = !buttonsOnly && (full
+			? (prefs.showIP || prefs.showStorage || prefs.showUptime || prefs.showThermal)
+			: (prefs.collapsedShowStorage || prefs.collapsedShowUptime || prefs.collapsedShowThermal));
 		[stats refresh];
 		NSArray<IBModule *> *modules = [IBFormatter modulesForStats:stats prefs:prefs];
 		dispatch_async(dispatch_get_main_queue(), ^{
