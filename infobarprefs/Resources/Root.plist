@@ -928,7 +928,7 @@
 			<key>key</key>
 			<string>showNetwork</string>
 			<key>label</key>
-			<string>Speed ↑↓</string>
+			<string>Speed ↓↑</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
