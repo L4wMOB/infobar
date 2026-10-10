@@ -28,10 +28,10 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) BOOL showOnLockScreen;
 @property (nonatomic, readonly) BOOL hideInLandscape;
 @property (nonatomic, readonly) BOOL doubleTapTogglesLayout;
+@property (nonatomic, readonly) BOOL clickThrough;
 @property (nonatomic, readonly) BOOL collapsed;
 @property (nonatomic, readonly) BOOL showCollapseButton;
 @property (nonatomic, readonly) IBCollapsedMode collapsedMode;
-// Values in the collapsed summary (max 4, in this order)
 @property (nonatomic, readonly) BOOL collapsedShowTime;
 @property (nonatomic, readonly) BOOL collapsedShowCPU;
 @property (nonatomic, readonly) BOOL collapsedShowRAM;
@@ -42,7 +42,7 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) BOOL collapsedShowUptime;
 @property (nonatomic, readonly) BOOL collapsedShowThermal;
 @property (nonatomic, readonly) double updateInterval;
-@property (nonatomic, readonly) CGPoint position; // relative (0..1), {-1,-1} = default
+@property (nonatomic, readonly) CGPoint position;
 
 // Appearance
 @property (nonatomic, readonly) IBLayout layout;
