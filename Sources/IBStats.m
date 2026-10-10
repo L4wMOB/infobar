@@ -228,6 +228,7 @@ static double IBEstimateCurrentCoreMHz(void) {
 		_netDownBytesPerSec = -1;
 		_netUpBytesPerSec = -1;
 
+		_measureCPU = _measureMemory = _measureBattery = _measureNetwork = _measureSystem = YES;
 		_history = [NSMutableArray array];
 		for (NSInteger i = 0; i < IBSeriesCount; i++) [_history addObject:[NSMutableArray arrayWithCapacity:IB_HISTORY_COUNT + 1]];
 
@@ -258,12 +259,13 @@ static double IBEstimateCurrentCoreMHz(void) {
 
 - (void)refresh {
 	@autoreleasepool {
-		[self refreshCPUUsage];
+		if (_measureCPU) [self refreshCPUUsage];
 		if (self.measureCPUFrequency) [self refreshCPUFrequency];
-		[self refreshMemory];
-		[self refreshBattery];
-		[self refreshNetwork];
-		[self refreshSystem];
+		if (_measureMemory) [self refreshMemory];
+		if (_measureBattery) [self refreshBattery];
+		if (_measureNetwork) [self refreshNetwork];
+		else _prevNetTime = 0; // the speed is measured from scratch when it is switched on again
+		if (_measureSystem) [self refreshSystem];
 		[self recordHistory];
 	}
 }
@@ -281,12 +283,13 @@ static double IBEstimateCurrentCoreMHz(void) {
 		[a addObject:@(v)];
 		if (a.count > IB_HISTORY_COUNT) [a removeObjectsInRange:NSMakeRange(0, a.count - IB_HISTORY_COUNT)];
 	};
-	if (_cpuUsage >= 0) push(IBSeriesCPU, _cpuUsage);
-	if (_ramUsagePercent >= 0) push(IBSeriesRAM, _ramUsagePercent);
-	if (_batteryPercent >= 0) push(IBSeriesCharge, _batteryPercent);
-	if (_batteryTemperature > -100) push(IBSeriesTemp, _batteryTemperature);
-	if (_batteryCycles >= 0) push(IBSeriesCycles, (double)_batteryCycles);
-	if (_netDownBytesPerSec >= 0 && _netUpBytesPerSec >= 0) {
+	// Only what was measured this time (no stale values)
+	if (_measureCPU && _cpuUsage >= 0) push(IBSeriesCPU, _cpuUsage);
+	if (_measureMemory && _ramUsagePercent >= 0) push(IBSeriesRAM, _ramUsagePercent);
+	if (_measureBattery && _batteryPercent >= 0) push(IBSeriesCharge, _batteryPercent);
+	if (_measureBattery && _batteryTemperature > -100) push(IBSeriesTemp, _batteryTemperature);
+	if (_measureBattery && _batteryCycles >= 0) push(IBSeriesCycles, (double)_batteryCycles);
+	if (_measureNetwork && _netDownBytesPerSec >= 0 && _netUpBytesPerSec >= 0) {
 		push(IBSeriesNetDown, _netDownBytesPerSec);
 		push(IBSeriesNetUp, _netUpBytesPerSec);
 	}
