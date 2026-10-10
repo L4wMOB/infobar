@@ -228,7 +228,7 @@ static const CGFloat kMinGraphWidth = 44;
 			[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
 		} else {
 			if (cell.alpha < 1) [UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
-			if (cell.label.attributedText.length > 0 && ![cell.label.attributedText.string isEqualToString:m.text.string]) {
+			if (![cell.label.attributedText.string ?: @"" isEqualToString:m.text.string]) {
 				[UIView transitionWithView:cell.label duration:dissolve
 								   options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
 								animations:^{ cell.label.attributedText = m.text; }
@@ -319,6 +319,7 @@ static CGFloat IBTopGap(IBModule *m) {
 	minH += _extraTop + _extraBottom;
 
 	if (_modules.count == 0) {
+		// Buttons only (collapsed without values)
 		return CGSizeMake(MAX(nButtons, 1) * kPinSize + 8, MAX(minH, kPinSize + 4 + _extraTop + _extraBottom));
 	}
 
@@ -336,14 +337,15 @@ static CGFloat IBTopGap(IBModule *m) {
 	CGSize labelSizes[n];
 	CGFloat graphColumnW = 0;
 	for (NSUInteger i = 0; i < n; i++) {
-		CGSize ls = [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
+		BOOL textless = _modules[i].text.length == 0;
+		CGSize ls = textless ? CGSizeZero : [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
 		NSString *key = [NSString stringWithFormat:@"%lu-%@", (unsigned long)i, _modules[i].identifier ?: @""];
 		NSString *shape = _modules[i].configKey ?: @"";
 		if (![_stickyShapes[key] isEqualToString:shape]) {
 			_stickyShapes[key] = shape;
 			[_stickyWidths removeObjectForKey:key];
 		}
-		CGFloat lw = MAX(ceil(MIN(ls.width, availW)), _stickyWidths[key].doubleValue);
+		CGFloat lw = textless ? 0 : MAX(ceil(MIN(ls.width, availW)), _stickyWidths[key].doubleValue);
 		lw = MIN(lw, availW);
 		_stickyWidths[key] = @(lw);
 		labelSizes[i] = CGSizeMake(lw, ceil(ls.height));
@@ -360,12 +362,19 @@ static CGFloat IBTopGap(IBModule *m) {
 		BOOL hasGraph = [self hasGraphAtIndex:i];
 		CGSize ls = labelSizes[i];
 		CGFloat topGap = IBTopGap(_modules[i]);
-		CGFloat textH = ls.height - topGap;
+		CGFloat textH = ls.height - topGap; // the text starts right at the top of its row
+		// In both layouts the graph sits right below its value
+		BOOL graphOnly = hasGraph && ls.width <= 0;
+		CGFloat gap = textH > 0 ? kGraphGapBelow : 0;
 		CGFloat cw = ls.width;
-		if (hasGraph) cw = list ? listGraphW : MIN(MAX(ls.width, kMinGraphWidth), availW);
-		CGFloat ch = hasGraph ? textH + kGraphGapBelow + gh : textH;
+		if (hasGraph) {
+			if (list) cw = listGraphW;
+			else if (graphOnly) cw = MIN(MAX(_graphWidth, kMinGraphWidth), availW); // width from the slider
+			else cw = MIN(MAX(ls.width, kMinGraphWidth), availW);
+		}
+		CGFloat ch = hasGraph ? textH + gap + gh : textH;
 		CGRect cell, label = CGRectMake(0, -topGap, ls.width, ls.height), graph = CGRectZero;
-		if (hasGraph) graph = CGRectMake(0, textH + kGraphGapBelow, cw, gh);
+		if (hasGraph) graph = CGRectMake(0, textH + gap, cw, gh);
 
 		if (list) {
 			CGFloat gapAfter = listGap + (hasGraph ? 1.5 : 0);
@@ -393,6 +402,7 @@ static CGFloat IBTopGap(IBModule *m) {
 
 	CGFloat W = MIN(contentX + contentW + rightPad, maxWidth);
 	CGFloat H = MAX(contentH + topPad + botPad, minH);
+	// Center the content between the paddings (the buttons can make the bar taller)
 	CGFloat offsetY = topPad + MAX(0, (H - topPad - botPad - contentH) / 2);
 	for (NSUInteger i = 0; i < n; i++) {
 		CGRect c = _cellFrames[i].CGRectValue;
@@ -419,6 +429,7 @@ static CGFloat IBTopGap(IBModule *m) {
 	NSArray<UIButton *> *buttons = [self visibleButtons];
 	CGFloat contentTop = _extraTop, contentBottom = b.size.height - _extraBottom;
 	for (NSUInteger i = 0; i < buttons.count; i++) {
+		// bounds + center instead of frame since the pin may be rotated
 		buttons[i].bounds = CGRectMake(0, 0, kPinSize, kPinSize);
 		if (_layout == IBLayoutList)
 			buttons[i].center = CGPointMake(b.size.width - 3 - kPinSize / 2, contentTop + 3 + kPinSize / 2 + i * kPinSize);
@@ -432,6 +443,7 @@ static CGFloat IBTopGap(IBModule *m) {
 		CGRect cellFrame = _cellFrames[i].CGRectValue;
 		CGRect labelFrame = _labelFrames[i].CGRectValue;
 		if (cell.justShown) {
+			// A new module is placed directly, only its opacity animates
 			[UIView performWithoutAnimation:^{
 				cell.frame = cellFrame;
 				cell.label.frame = labelFrame;
@@ -498,6 +510,7 @@ static CGFloat IBTopGap(IBModule *m) {
 	if (tap.state == UIGestureRecognizerStateRecognized) [self.delegate barViewDidDoubleTap:self];
 }
 
+// Give the small buttons a more forgiving hit area
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
 	if (!self.hidden && [self pointInside:point withEvent:event]) {
 		UIButton *best = nil;
