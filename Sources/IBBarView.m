@@ -8,7 +8,6 @@ static const CGFloat kPadV = 5;
 static const CGFloat kPinSize = 20;
 static const CGFloat kCellGapH = 12;
 static const CGFloat kLineGapRow = 4;
-static const CGFloat kLineGapList = 3;
 static const CGFloat kGraphGapBelow = 2;
 static const CGFloat kMinGraphWidth = 44;
 
@@ -17,6 +16,8 @@ static const CGFloat kMinGraphWidth = 44;
 @interface IBCellView : UIView
 @property (nonatomic, readonly) UILabel *label;
 @property (nonatomic, readonly) IBGraphView *graph;
+@property (nonatomic) BOOL justShown;
+@property (nonatomic) BOOL graphJustShown;
 @end
 
 @implementation IBCellView
@@ -58,6 +59,7 @@ static const CGFloat kMinGraphWidth = 44;
 	CGFloat _graphHeight, _graphWidth;
 	CGFloat _extraTop, _extraBottom;
 	CGFloat _fontSize;
+	CGFloat _updateInterval;
 	CGFloat _shadowStrength;
 	NSMutableDictionary<NSString *, NSNumber *> *_stickyWidths;
 	NSString *_moduleSignature;
@@ -82,6 +84,7 @@ static const CGFloat kMinGraphWidth = 44;
 		_graphHeight = 22;
 		_graphWidth = 60;
 		_shadowStrength = 0.9;
+		_updateInterval = 1.0;
 		_stickyWidths = [NSMutableDictionary dictionary];
 		_stickyShapes = [NSMutableDictionary dictionary];
 		_moduleSignature = @"";
@@ -145,6 +148,7 @@ static const CGFloat kMinGraphWidth = 44;
 	_doubleTap.enabled = prefs.doubleTapTogglesLayout;
 
 	_shadowStrength = prefs.shadowStrength;
+	_updateInterval = prefs.updateInterval;
 	for (IBCellView *cell in _cells) [self applyShadowToCell:cell];
 	_graphHeight = prefs.graphHeight;
 	_graphWidth = prefs.graphWidth;
@@ -196,31 +200,55 @@ static const CGFloat kMinGraphWidth = 44;
 	}
 	while (_cells.count < _modules.count) {
 		IBCellView *cell = [IBCellView new];
+		cell.hidden = YES;
 		[self applyShadowToCell:cell];
 		[self insertSubview:cell belowSubview:_pinButton];
 		[_cells addObject:cell];
 	}
+	NSTimeInterval dissolve = MIN(0.45, MAX(0.2, _updateInterval * 0.5));
 	for (NSUInteger i = 0; i < _cells.count; i++) {
 		IBCellView *cell = _cells[i];
 		if (i >= _modules.count) {
-			cell.hidden = YES;
+			if (!cell.hidden && cell.alpha > 0.01) {
+				[UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 0; } completion:^(BOOL finished) {
+					if (i >= self->_modules.count) cell.hidden = YES;
+				}];
+			} else {
+				cell.hidden = YES;
+			}
 			continue;
 		}
 		IBModule *m = _modules[i];
-		BOOL wasHidden = cell.hidden;
-		cell.hidden = NO;
-		if (!wasHidden && cell.label.attributedText.length > 0 && ![cell.label.attributedText.string isEqualToString:m.text.string]) {
-			[UIView transitionWithView:cell.label duration:0.3
-							   options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
-							animations:^{ cell.label.attributedText = m.text; }
-							completion:nil];
-		} else {
+		BOOL appearing = cell.hidden || cell.alpha < 0.5;
+		if (appearing) {
+			cell.hidden = NO;
+			cell.alpha = 0;
+			cell.justShown = YES;
 			cell.label.attributedText = m.text;
+			[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
+		} else {
+			if (cell.alpha < 1) [UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
+			if (cell.label.attributedText.length > 0 && ![cell.label.attributedText.string isEqualToString:m.text.string]) {
+				[UIView transitionWithView:cell.label duration:dissolve
+								   options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
+								animations:^{ cell.label.attributedText = m.text; }
+								completion:nil];
+			} else {
+				cell.label.attributedText = m.text;
+			}
 		}
+
 		BOOL hasGraph = m.graphSeries.count > 0;
-		cell.graph.hidden = !hasGraph;
+		IBGraphView *g = cell.graph;
 		if (hasGraph) {
-			IBGraphView *g = cell.graph;
+			if (g.hidden || g.alpha < 0.5) {
+				g.hidden = NO;
+				g.alpha = 0;
+				cell.graphJustShown = YES;
+				[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ g.alpha = 1; } completion:nil];
+			} else if (g.alpha < 1) {
+				[UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ g.alpha = 1; } completion:nil];
+			}
 			g.minValue = m.graphMin;
 			g.maxValue = m.graphMax;
 			g.minSpan = m.graphMinSpan > 0 ? m.graphMinSpan : 1;
@@ -231,7 +259,15 @@ static const CGFloat kMinGraphWidth = 44;
 			g.unit = (IBGraphUnit)m.graphUnit;
 			g.valueScale = m.graphValueScale;
 			g.valueOffset = m.graphValueOffset;
-			g.series = m.graphSeries; // redraws
+			g.scrollDuration = _updateInterval;
+			g.series = m.graphSeries; // redraws / scrolls
+		} else if (!g.hidden) {
+			[UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ g.alpha = 0; } completion:^(BOOL finished) {
+				if (![self hasGraphAtIndex:i]) {
+					g.hidden = YES;
+					g.alpha = 1;
+				}
+			}];
 		}
 	}
 	[self setNeedsLayout];
@@ -253,21 +289,11 @@ static const CGFloat kMinGraphWidth = 44;
 	text.shadowOffset = CGSizeMake(0, 0.75);
 }
 
-static NSString *IBTextShape(NSString *text) {
-	NSMutableString *out = [NSMutableString string];
-	unichar prev = 0;
-	for (NSUInteger i = 0; i < text.length; i++) {
-		unichar c = [text characterAtIndex:i];
-		unichar kind = c;
-		if ((c >= '0' && c <= '9') || c == '.' || c == ',') kind = '0';
-		else if ([[NSCharacterSet letterCharacterSet] characterIsMember:c]) kind = 'a';
-		else if (c == 0x2007 || c == 0x2060 || c == 0xFFFC) continue; // padding / icon
-		else if (c == 0x00A0) kind = ' ';
-		if (kind == prev && (kind == '0' || kind == 'a')) continue;
-		[out appendFormat:@"%C", kind];
-		prev = kind;
-	}
-	return out;
+static CGFloat IBTopGap(IBModule *m) {
+	NSAttributedString *t = m.text;
+	UIFont *f = t.length > 0 ? [t attribute:NSFontAttributeName atIndex:t.length - 1 effectiveRange:NULL] : nil;
+	if (!f) return 0;
+	return round(MAX(0, f.ascender - f.capHeight) * 2) / 2;
 }
 
 - (NSArray<UIButton *> *)visibleButtons {
@@ -293,19 +319,7 @@ static NSString *IBTextShape(NSString *text) {
 	minH += _extraTop + _extraBottom;
 
 	if (_modules.count == 0) {
-		// Buttons only (collapsed without values)
 		return CGSizeMake(MAX(nButtons, 1) * kPinSize + 8, MAX(minH, kPinSize + 4 + _extraTop + _extraBottom));
-	}
-
-	{
-		IBModule *firstModule = _modules.firstObject;
-		NSAttributedString *t = firstModule.text;
-		UIFont *f = t.length > 0 ? [t attribute:NSFontAttributeName atIndex:t.length - 1 effectiveRange:NULL] : nil;
-		if (f) {
-			CGFloat topGap = f.ascender - f.capHeight;
-			CGFloat bottomGap = [self hasGraphAtIndex:_modules.count - 1] ? 0 : -f.descender;
-			topPad -= MIN(MAX(0, topGap - bottomGap), kPadV - 1);
-		}
 	}
 
 	CGFloat contentX = list ? kPadH : (nButtons > 0 ? 4 + nButtons * kPinSize + 2 : kPadH);
@@ -324,7 +338,7 @@ static NSString *IBTextShape(NSString *text) {
 	for (NSUInteger i = 0; i < n; i++) {
 		CGSize ls = [_cells[i].label sizeThatFits:CGSizeMake(availW, CGFLOAT_MAX)];
 		NSString *key = [NSString stringWithFormat:@"%lu-%@", (unsigned long)i, _modules[i].identifier ?: @""];
-		NSString *shape = IBTextShape(_modules[i].text.string);
+		NSString *shape = _modules[i].configKey ?: @"";
 		if (![_stickyShapes[key] isEqualToString:shape]) {
 			_stickyShapes[key] = shape;
 			[_stickyWidths removeObjectForKey:key];
@@ -340,22 +354,25 @@ static NSString *IBTextShape(NSString *text) {
 	CGFloat contentW = 0, contentH = 0;
 	CGFloat x = 0, y = 0, lineH = 0;
 	CGFloat listGraphW = MIN(MAX(_graphWidth, graphColumnW), availW);
+	CGFloat listGap = MAX(0.5, round(_fontSize * 0.08 * 2) / 2);
 
 	for (NSUInteger i = 0; i < n; i++) {
 		BOOL hasGraph = [self hasGraphAtIndex:i];
 		CGSize ls = labelSizes[i];
-		// In both layouts the graph sits right below its value
+		CGFloat topGap = IBTopGap(_modules[i]);
+		CGFloat textH = ls.height - topGap;
 		CGFloat cw = ls.width;
 		if (hasGraph) cw = list ? listGraphW : MIN(MAX(ls.width, kMinGraphWidth), availW);
-		CGFloat ch = hasGraph ? ls.height + kGraphGapBelow + gh : ls.height;
-		CGRect cell, label = CGRectMake(0, 0, ls.width, ls.height), graph = CGRectZero;
-		if (hasGraph) graph = CGRectMake(0, ls.height + kGraphGapBelow, cw, gh);
+		CGFloat ch = hasGraph ? textH + kGraphGapBelow + gh : textH;
+		CGRect cell, label = CGRectMake(0, -topGap, ls.width, ls.height), graph = CGRectZero;
+		if (hasGraph) graph = CGRectMake(0, textH + kGraphGapBelow, cw, gh);
 
 		if (list) {
+			CGFloat gapAfter = listGap + (hasGraph ? 1.5 : 0);
 			cell = CGRectMake(0, y, cw, ch);
-			y += ch + kLineGapList;
+			y += ch + gapAfter;
 			contentW = MAX(contentW, cw);
-			contentH = y - kLineGapList;
+			contentH = y - gapAfter;
 		} else {
 			if (x > 0 && x + cw > availW) {
 				// Wrap between modules
@@ -376,7 +393,6 @@ static NSString *IBTextShape(NSString *text) {
 
 	CGFloat W = MIN(contentX + contentW + rightPad, maxWidth);
 	CGFloat H = MAX(contentH + topPad + botPad, minH);
-	// Center the content between the paddings (the buttons can make the bar taller)
 	CGFloat offsetY = topPad + MAX(0, (H - topPad - botPad - contentH) / 2);
 	for (NSUInteger i = 0; i < n; i++) {
 		CGRect c = _cellFrames[i].CGRectValue;
@@ -403,7 +419,6 @@ static NSString *IBTextShape(NSString *text) {
 	NSArray<UIButton *> *buttons = [self visibleButtons];
 	CGFloat contentTop = _extraTop, contentBottom = b.size.height - _extraBottom;
 	for (NSUInteger i = 0; i < buttons.count; i++) {
-		// bounds + center instead of frame since the pin may be rotated
 		buttons[i].bounds = CGRectMake(0, 0, kPinSize, kPinSize);
 		if (_layout == IBLayoutList)
 			buttons[i].center = CGPointMake(b.size.width - 3 - kPinSize / 2, contentTop + 3 + kPinSize / 2 + i * kPinSize);
@@ -414,9 +429,27 @@ static NSString *IBTextShape(NSString *text) {
 	for (NSUInteger i = 0; i < _cells.count; i++) {
 		IBCellView *cell = _cells[i];
 		if (i >= _modules.count || i >= _cellFrames.count) continue;
-		cell.frame = _cellFrames[i].CGRectValue;
-		cell.label.frame = _labelFrames[i].CGRectValue;
-		if (!cell.graph.hidden) cell.graph.frame = _graphFrames[i].CGRectValue;
+		CGRect cellFrame = _cellFrames[i].CGRectValue;
+		CGRect labelFrame = _labelFrames[i].CGRectValue;
+		if (cell.justShown) {
+			[UIView performWithoutAnimation:^{
+				cell.frame = cellFrame;
+				cell.label.frame = labelFrame;
+			}];
+			cell.justShown = NO;
+		} else {
+			cell.frame = cellFrame;
+			cell.label.frame = labelFrame;
+		}
+		if ([self hasGraphAtIndex:i]) {
+			CGRect graphFrame = _graphFrames[i].CGRectValue;
+			if (cell.graphJustShown) {
+				[UIView performWithoutAnimation:^{ cell.graph.frame = graphFrame; }];
+				cell.graphJustShown = NO;
+			} else {
+				cell.graph.frame = graphFrame;
+			}
+		}
 	}
 }
 
@@ -465,7 +498,6 @@ static NSString *IBTextShape(NSString *text) {
 	if (tap.state == UIGestureRecognizerStateRecognized) [self.delegate barViewDidDoubleTap:self];
 }
 
-// Give the small buttons a more forgiving hit area
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
 	if (!self.hidden && [self pointInside:point withEvent:event]) {
 		UIButton *best = nil;
