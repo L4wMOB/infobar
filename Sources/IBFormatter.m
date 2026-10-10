@@ -99,6 +99,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 @property (nonatomic) NSInteger graphUnit;
 @property (nonatomic) double graphValueScale;
 @property (nonatomic) double graphValueOffset;
+@property (nonatomic) BOOL graphOnly; // only the graph, no icon / text
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
@@ -223,7 +224,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if (p.showCPU || p.showCPUFreq || p.showCPUGraph) {
 			IBItem *it = add(@[@"cpu"], @"CPU");
-			BOOL cpuPercent = p.showCPU || !p.showCPUFreq;
+			it.graphOnly = !(p.showCPU || p.showCPUFreq);
+			BOOL cpuPercent = p.showCPU;
 			if (cpuPercent) append(it, IBPct(s.cpuUsage), IBLevelAscending(s.cpuUsage, 50, 80));
 			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[goodC], 0, 100, 100, 50, 80, YES, IBGraphUnitPercent);
 			if (p.showCPUFreq) {
@@ -249,7 +251,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if (p.showRAMPercent || p.showRAMGB || p.showRAMGraph) {
 			IBItem *it = add(@[@"memorychip"], @"RAM");
-			BOOL ramPercent = p.showRAMPercent || !p.showRAMGB;
+			it.graphOnly = !(p.showRAMPercent || p.showRAMGB);
+			BOOL ramPercent = p.showRAMPercent;
 			if (ramPercent) append(it, IBPct(s.ramUsagePercent), IBLevelAscending(s.ramUsagePercent, 65, 85));
 			if (p.showRAMGraph) attachGraph(it, @[[s historyForSeries:IBSeriesRAM]], @[goodC], 0, 100, 100, 65, 85, YES, IBGraphUnitPercent);
 			if (p.showRAMGB) {
@@ -268,6 +271,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			else if (pct >= 13) sym = @"battery.25";
 			else sym = @"battery.0";
 			IBItem *it = add(@[sym, @"battery.100"], @"BAT");
+			it.graphOnly = !p.showBattery;
 			append(it, IBPct(pct), IBLevelDescending(pct, 40, 20));
 			if (p.showChargeGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCharge]], @[goodC], 0, 100, 100, 20, 40, NO, IBGraphUnitPercent);
 			if (list && s.batteryMaxCapacity > 0 && pct >= 0)
@@ -276,6 +280,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if ((p.showBatteryTemp || p.showTempGraph) && s.batteryTemperature > -100) {
 			IBItem *it = add(@[@"thermometer.medium", @"thermometer"], @"TMP");
+			it.graphOnly = !p.showBatteryTemp;
 			double t = s.batteryTemperature;
 			NSString *text = p.useFahrenheit ? [NSString stringWithFormat:@"%.1f°F", t * 9.0 / 5.0 + 32.0] : [NSString stringWithFormat:@"%.1f°C", t];
 			append(it, text, IBLevelAscending(t, 36, 42));
@@ -309,12 +314,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if ((p.showBatteryCycles || p.showCyclesGraph) && s.batteryCycles >= 0) {
 			IBItem *it = add(@[@"arrow.triangle.2.circlepath"], @"CYC");
+			it.graphOnly = !p.showBatteryCycles;
 			append(it, [NSString stringWithFormat:@"%ld%@", (long)s.batteryCycles, list ? @" cycles" : @""], IBLevelNone);
 			if (p.showCyclesGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCycles]], @[goodC], NAN, NAN, 2, 500, 1000, YES, IBGraphUnitNumber);
 		}
 
 		if (p.showNetwork || p.showNetworkGraph) {
 			IBItem *it = add(@[@"arrow.up.arrow.down"], @"NET");
+			it.graphOnly = !p.showNetwork;
 			append(it, [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
 			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[goodC, [UIColor colorWithWhite:1 alpha:0.75]], 0, NAN, 10240, 1048576, 5242880, YES, IBGraphUnitBytesPerSec);
 		}
@@ -389,10 +396,12 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 	for (IBItem *item in items) {
 		NSMutableAttributedString *line = [NSMutableAttributedString new];
-		UIImage *icon = p.useIcons ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base] : nil;
+		BOOL textless = item.graphOnly;
+		UIImage *icon = (p.useIcons && !textless) ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base] : nil;
 		if (icon) {
 			NSTextAttachment *att = [NSTextAttachment new];
 			att.image = icon;
+			// Vertically center the symbol on the cap height
 			CGSize size = icon.size;
 			att.bounds = CGRectMake(0, round((font.capHeight - size.height) / 2.0), size.width, size.height);
 			[line appendAttributedString:[NSAttributedString attributedStringWithAttachment:att]];
@@ -401,7 +410,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			} else {
 				[line appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u00A0" attributes:labelAttrs]];
 			}
-		} else if (item.label.length > 0) {
+		} else if (item.label.length > 0 && !textless) {
 			if (list) {
 				NSMutableAttributedString *lab = [[NSMutableAttributedString alloc] initWithString:item.label attributes:labelAttrs];
 				[lab addAttribute:NSKernAttributeName value:@(2.5) range:NSMakeRange(lab.length - 1, 1)];
@@ -412,8 +421,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 		}
 		// Never wrap inside a module, only between modules
 		[item.value.mutableString replaceOccurrencesOfString:@" " withString:@"\u00A0" options:0 range:NSMakeRange(0, item.value.length)];
-		[line appendAttributedString:item.value];
-		[line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
+		if (!textless) [line appendAttributedString:item.value];
+		if (line.length > 0) [line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
 
 		IBModule *m = [IBModule new];
 		m.identifier = item.label ?: @"";
