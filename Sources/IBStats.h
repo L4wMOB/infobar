@@ -29,6 +29,13 @@ typedef NS_ENUM(NSInteger, IBSeries) {
 
 // Only measure the clock when it's shown (estimation costs some CPU time)
 @property (nonatomic) BOOL measureCPUFrequency;
+// Only read what is actually shown (all default to YES). Every reading costs
+// battery, so unused ones are skipped.
+@property (nonatomic) BOOL measureCPU;
+@property (nonatomic) BOOL measureMemory;
+@property (nonatomic) BOOL measureBattery;
+@property (nonatomic) BOOL measureNetwork;
+@property (nonatomic) BOOL measureSystem;  // storage, IP, uptime, thermal state
 
 // CPU
 @property (nonatomic, readonly) double cpuUsage;              // 0..100
