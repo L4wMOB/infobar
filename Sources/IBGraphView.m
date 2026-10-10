@@ -2,8 +2,6 @@
 #import "IBStats.h"
 #import <QuartzCore/QuartzCore.h>
 
-static const CFTimeInterval kAnimDuration = 0.4;
-
 static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	switch (unit) {
 		case IBGraphUnitPercent: return [NSString stringWithFormat:@"%.0f%%", v];
@@ -20,17 +18,22 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 @implementation IBGraphView {
 	CADisplayLink *_link;
 	CFTimeInterval _animStart;
-	CGFloat _progress;       // 0 -> 1 during a scroll
+	CGFloat _progress;
+	CFTimeInterval _animDuration;
+	CGFloat _shiftFrom;
 	BOOL _rangeInit;
 	double _curLo, _curHi;
+	CFTimeInterval _lastRangeTime;
 	BOOL _rangeConverged;
+	double _valueFrom, _valueTo;
+	BOOL _valueInit;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
-		self.userInteractionEnabled = NO;
+		self.userInteractionEnabled = NO; // touches go to the bar (drag, double tap)
 		self.contentMode = UIViewContentModeRedraw;
 		_series = @[];
 		_colors = @[];
@@ -42,6 +45,9 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 		_minSpan = 1;
 		_valueScale = 1;
 		_progress = 1;
+		_shiftFrom = 1;
+		_scrollDuration = 1;
+		_animDuration = 1;
 		_rangeConverged = YES;
 	}
 	return self;
@@ -58,22 +64,37 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 #pragma mark Properties
 
+- (double)displayedValue {
+	return _valueFrom + (_valueTo - _valueFrom) * _progress;
+}
+
 - (void)setSeries:(NSArray<NSArray<NSNumber *> *> *)series {
 	NSArray *old = _series;
 	series = [series copy] ?: @[];
 	if ([series isEqualToArray:old]) return;
 	_series = series;
+
 	NSArray *newFirst = series.firstObject;
 	NSArray *oldFirst = old.firstObject;
 	NSUInteger newCount = newFirst.count, oldCount = oldFirst.count;
+	double newest = newFirst.count > 0 ? [newFirst.lastObject doubleValue] : 0;
+
 	BOOL scroll = old.count > 0 && old.count == series.count && newCount >= 2 && _rangeInit
 		&& newCount >= oldCount && newCount <= oldCount + 1;
 	if (scroll) {
+		CGFloat left = _progress < 1 ? _shiftFrom * (1 - _progress) : 0;
+		_shiftFrom = MIN(1 + left, 2);
+		_animDuration = MAX(0.2, _scrollDuration) * _shiftFrom;
+		_valueFrom = _valueInit ? [self displayedValue] : newest;
+		_valueTo = newest;
 		_progress = 0;
 		_animStart = CACurrentMediaTime();
 	} else {
+		_shiftFrom = 1;
+		_valueFrom = _valueTo = newest;
 		_progress = 1;
 	}
+	_valueInit = YES;
 	[self startLink];
 	[self setNeedsDisplay];
 }
@@ -116,7 +137,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 }
 
 - (void)tick:(CADisplayLink *)link {
-	if (_progress < 1) _progress = MIN(1, (CACurrentMediaTime() - _animStart) / kAnimDuration);
+	if (_progress < 1) _progress = MIN(1, (CACurrentMediaTime() - _animStart) / _animDuration);
 	[self setNeedsDisplay];
 	if (_progress >= 1 && _rangeConverged) [self stopLink];
 }
@@ -135,8 +156,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	CGFloat W = b.size.width, H = b.size.height;
 
 	CGFloat step = W / (IB_HISTORY_COUNT - 1);
-	CGFloat eased = 1 - pow(1 - _progress, 3);
-	CGFloat shift = (1 - eased) * step;
+	CGFloat shift = _shiftFrom * (1 - _progress) * step;
 
 	CGContextSaveGState(ctx);
 	CGContextSetLineWidth(ctx, 0.5);
@@ -188,8 +208,11 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 			_rangeInit = YES;
 		} else {
 			double span = MAX(hi - lo, 1e-9);
-			_curLo += (lo - _curLo) * 0.25;
-			_curHi += (hi - _curHi) * 0.25;
+			CFTimeInterval now = CACurrentMediaTime();
+			double dt = MIN(MAX(now - _lastRangeTime, 0.0), 0.1);
+			double k = 1 - exp(-dt * 7);
+			_curLo += (lo - _curLo) * k;
+			_curHi += (hi - _curHi) * k;
 			if (fabs(_curLo - lo) > span * 0.005 || fabs(_curHi - hi) > span * 0.005) {
 				_rangeConverged = NO;
 			} else {
@@ -197,6 +220,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 				_curHi = hi;
 			}
 		}
+		_lastRangeTime = CACurrentMediaTime();
 		lo = _curLo;
 		hi = _curHi;
 		double range = hi - lo;
@@ -233,16 +257,9 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 					}
 					line.lineJoinStyle = kCGLineJoinRound;
 
-					CGFloat edgeY = lastY;
-					if (shift > 0.01 && n >= 2) {
-						CGFloat prevY = yFor(s[n - 2].doubleValue);
-						CGFloat t = 1 - shift / step;
-						edgeY = prevY + (lastY - prevY) * t;
-					}
-
 					UIColor *plain = seriesIndex < _colors.count ? _colors[seriesIndex] : [UIColor whiteColor];
 					if (seriesIndex == 0) {
-						currentValue = s[n - 1].doubleValue;
+						currentValue = [self displayedValue];
 						UIBezierPath *fill = [line copy];
 						[fill addLineToPoint:CGPointMake(endX, H + 2)];
 						[fill addLineToPoint:CGPointMake(startX, H + 2)];
@@ -273,13 +290,6 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 							[plain setStroke];
 							[line stroke];
 						}
-						UIColor *dot = plain;
-						if (banded) {
-							double v = currentValue;
-							dot = _bandColors[v < _bandThresholds[0].doubleValue ? 0 : (v < _bandThresholds[1].doubleValue ? 1 : 2)];
-						}
-						[dot setFill];
-						[[UIBezierPath bezierPathWithOvalInRect:CGRectMake(W - 4.5, edgeY - 1.8, 3.6, 3.6)] fill];
 					} else {
 						line.lineWidth = 1.0;
 						[plain setStroke];
