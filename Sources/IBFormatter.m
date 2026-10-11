@@ -39,6 +39,13 @@ static UIColor *IBPickDistinct(NSArray<UIColor *> *candidates, NSArray<UIColor *
 	return candidates.lastObject;
 }
 
+static UIColor *IBOutlineColor(IBPrefs *p, UIColor *itemColor, UIColor *base) {
+	if (p.outlineColorMode == 2) return [UIColor whiteColor];
+	if (p.outlineColorMode == 1) return [UIColor blackColor];
+	if (itemColor && IBColorDistance(itemColor, base) > 0.08) return itemColor;
+	return [UIColor blackColor];
+}
+
 static NSString *IBPct(double v) {
 	if (v < 0) return @"–";
 	NSString *s = [NSString stringWithFormat:@"%.0f%%", v];
@@ -99,6 +106,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 @property (nonatomic) NSInteger graphUnit;
 @property (nonatomic) double graphValueScale;
 @property (nonatomic) double graphValueOffset;
+@property (nonatomic) BOOL graphOnly;
 @property (nonatomic) double graphMin;
 @property (nonatomic) double graphMax;
 @property (nonatomic) double graphMinSpan;
@@ -112,11 +120,11 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 @implementation IBFormatter
 
-+ (UIImage *)symbolNamed:(NSArray<NSString *> *)names size:(CGFloat)size color:(UIColor *)color {
++ (UIImage *)symbolNamed:(NSArray<NSString *> *)names size:(CGFloat)size color:(UIColor *)color outline:(UIColor *)outline {
 	static NSCache *cache;
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{ cache = [NSCache new]; });
-	NSString *key = [NSString stringWithFormat:@"%@|%.1f|%@", names.firstObject, size, color];
+	NSString *key = [NSString stringWithFormat:@"%@|%.1f|%@|%@", names.firstObject, size, color, outline];
 	UIImage *cached = [cache objectForKey:key];
 	if (cached) return cached;
 
@@ -124,9 +132,23 @@ static NSString *IBDuration(NSTimeInterval t) {
 	for (NSString *name in names) {
 		UIImage *img = [UIImage systemImageNamed:name withConfiguration:config];
 		if (img) {
-			img = [img imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
-			[cache setObject:img forKey:key];
-			return img;
+			UIImage *fillImage = [img imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
+			if (outline) {
+				UIImage *edgeImage = [img imageWithTintColor:outline renderingMode:UIImageRenderingModeAlwaysOriginal];
+				CGFloat w = 0.9, pad = 1;
+				CGSize sz = img.size;
+				UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
+				UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(sz.width + 2 * pad, sz.height + 2 * pad) format:format];
+				fillImage = [renderer imageWithActions:^(UIGraphicsImageRendererContext *rc) {
+					for (int k = 0; k < 8; k++) {
+						CGFloat ang = k * M_PI_4;
+						[edgeImage drawAtPoint:CGPointMake(pad + w * cos(ang), pad + w * sin(ang))];
+					}
+					[fillImage drawAtPoint:CGPointMake(pad, pad)];
+				}];
+			}
+			[cache setObject:fillImage forKey:key];
+			return fillImage;
 		}
 	}
 	return nil;
@@ -223,7 +245,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if (p.showCPU || p.showCPUFreq || p.showCPUGraph) {
 			IBItem *it = add(@[@"cpu"], @"CPU");
-			BOOL cpuPercent = p.showCPU || !p.showCPUFreq;
+			it.graphOnly = !(p.showCPU || p.showCPUFreq);
+			BOOL cpuPercent = p.showCPU;
 			if (cpuPercent) append(it, IBPct(s.cpuUsage), IBLevelAscending(s.cpuUsage, 50, 80));
 			if (p.showCPUGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCPU]], @[goodC], 0, 100, 100, 50, 80, YES, IBGraphUnitPercent);
 			if (p.showCPUFreq) {
@@ -249,7 +272,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if (p.showRAMPercent || p.showRAMGB || p.showRAMGraph) {
 			IBItem *it = add(@[@"memorychip"], @"RAM");
-			BOOL ramPercent = p.showRAMPercent || !p.showRAMGB;
+			it.graphOnly = !(p.showRAMPercent || p.showRAMGB);
+			BOOL ramPercent = p.showRAMPercent;
 			if (ramPercent) append(it, IBPct(s.ramUsagePercent), IBLevelAscending(s.ramUsagePercent, 65, 85));
 			if (p.showRAMGraph) attachGraph(it, @[[s historyForSeries:IBSeriesRAM]], @[goodC], 0, 100, 100, 65, 85, YES, IBGraphUnitPercent);
 			if (p.showRAMGB) {
@@ -268,6 +292,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			else if (pct >= 13) sym = @"battery.25";
 			else sym = @"battery.0";
 			IBItem *it = add(@[sym, @"battery.100"], @"BAT");
+			it.graphOnly = !p.showBattery;
 			append(it, IBPct(pct), IBLevelDescending(pct, 40, 20));
 			if (p.showChargeGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCharge]], @[goodC], 0, 100, 100, 20, 40, NO, IBGraphUnitPercent);
 			if (list && s.batteryMaxCapacity > 0 && pct >= 0)
@@ -276,6 +301,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if ((p.showBatteryTemp || p.showTempGraph) && s.batteryTemperature > -100) {
 			IBItem *it = add(@[@"thermometer.medium", @"thermometer"], @"TMP");
+			it.graphOnly = !p.showBatteryTemp;
 			double t = s.batteryTemperature;
 			NSString *text = p.useFahrenheit ? [NSString stringWithFormat:@"%.1f°F", t * 9.0 / 5.0 + 32.0] : [NSString stringWithFormat:@"%.1f°C", t];
 			append(it, text, IBLevelAscending(t, 36, 42));
@@ -309,12 +335,14 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 		if ((p.showBatteryCycles || p.showCyclesGraph) && s.batteryCycles >= 0) {
 			IBItem *it = add(@[@"arrow.triangle.2.circlepath"], @"CYC");
+			it.graphOnly = !p.showBatteryCycles;
 			append(it, [NSString stringWithFormat:@"%ld%@", (long)s.batteryCycles, list ? @" cycles" : @""], IBLevelNone);
 			if (p.showCyclesGraph) attachGraph(it, @[[s historyForSeries:IBSeriesCycles]], @[goodC], NAN, NAN, 2, 500, 1000, YES, IBGraphUnitNumber);
 		}
 
 		if (p.showNetwork || p.showNetworkGraph) {
 			IBItem *it = add(@[@"arrow.up.arrow.down"], @"NET");
+			it.graphOnly = !p.showNetwork;
 			append(it, [NSString stringWithFormat:@"↓%@/s ↑%@/s", IBBytes(s.netDownBytesPerSec, 1), IBBytes(s.netUpBytesPerSec, 1)], IBLevelNone);
 			if (p.showNetworkGraph) attachGraph(it, @[[s historyForSeries:IBSeriesNetDown], [s historyForSeries:IBSeriesNetUp]], @[goodC, [UIColor colorWithWhite:1 alpha:0.75]], 0, NAN, 10240, 1048576, 5242880, YES, IBGraphUnitBytesPerSec);
 		}
@@ -382,14 +410,28 @@ static NSString *IBDuration(NSTimeInterval t) {
 	[cfg appendString:p.showCyclesGraph ? @"1" : @"0"];
 	[cfg appendString:p.showNetworkGraph ? @"1" : @"0"];
 	[cfg appendFormat:@"%ld%ld", (long)p.layout, (long)p.collapsedMode];
+	[cfg appendFormat:@"o%d%ld", p.outlineEnabled, (long)p.outlineColorMode];
 
 	NSDictionary *labelAttrs = @{NSFontAttributeName: font, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.85]};
 	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
 	para.lineBreakMode = NSLineBreakByWordWrapping;
+	NSShadow *textShadow = nil;
+	if (p.shadowStrength > 0.01) {
+		textShadow = [NSShadow new];
+		textShadow.shadowColor = [UIColor colorWithWhite:0 alpha:MIN(1.0, p.shadowStrength)];
+		textShadow.shadowOffset = CGSizeMake(0, 0.6);
+		textShadow.shadowBlurRadius = 1.6;
+	}
 
 	for (IBItem *item in items) {
 		NSMutableAttributedString *line = [NSMutableAttributedString new];
-		UIImage *icon = p.useIcons ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base] : nil;
+		BOOL textless = item.graphOnly;
+		UIColor *outlineColor = nil;
+		if (p.outlineEnabled) {
+			UIColor *itemColor = item.value.length > 0 ? [item.value attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:nil] : nil;
+			outlineColor = IBOutlineColor(p, itemColor, base);
+		}
+		UIImage *icon = (p.useIcons && !textless) ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base outline:outlineColor] : nil;
 		if (icon) {
 			NSTextAttachment *att = [NSTextAttachment new];
 			att.image = icon;
@@ -401,7 +443,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			} else {
 				[line appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u00A0" attributes:labelAttrs]];
 			}
-		} else if (item.label.length > 0) {
+		} else if (item.label.length > 0 && !textless) {
 			if (list) {
 				NSMutableAttributedString *lab = [[NSMutableAttributedString alloc] initWithString:item.label attributes:labelAttrs];
 				[lab addAttribute:NSKernAttributeName value:@(2.5) range:NSMakeRange(lab.length - 1, 1)];
@@ -410,15 +452,26 @@ static NSString *IBDuration(NSTimeInterval t) {
 				[line appendAttributedString:[[NSAttributedString alloc] initWithString:[item.label stringByAppendingString:@"\u00A0"] attributes:labelAttrs]];
 			}
 		}
-		// Never wrap inside a module, only between modules
 		[item.value.mutableString replaceOccurrencesOfString:@" " withString:@"\u00A0" options:0 range:NSMakeRange(0, item.value.length)];
-		[line appendAttributedString:item.value];
-		[line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
+		if (!textless) [line appendAttributedString:item.value];
+		if (line.length > 0) [line addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, line.length)];
+		NSAttributedString *outlineText = nil;
+		if (line.length > 0 && outlineColor) {
+			NSMutableAttributedString *edge = [line mutableCopy];
+			NSRange all = NSMakeRange(0, edge.length);
+			[edge addAttribute:NSStrokeColorAttributeName value:outlineColor range:all];
+			[edge addAttribute:NSStrokeWidthAttributeName value:@(1.7 / font.pointSize * 100) range:all];
+			if (textShadow) [edge addAttribute:NSShadowAttributeName value:textShadow range:all];
+			outlineText = edge;
+		} else if (line.length > 0 && textShadow) {
+			[line addAttribute:NSShadowAttributeName value:textShadow range:NSMakeRange(0, line.length)];
+		}
 
 		IBModule *m = [IBModule new];
 		m.identifier = item.label ?: @"";
 		m.configKey = cfg;
 		m.text = line;
+		m.outlineText = outlineText;
 		m.graphSeries = item.graphSeries ?: @[];
 		m.graphColors = item.graphColors ?: @[];
 		m.graphBandColors = item.graphBandColors ?: @[];
