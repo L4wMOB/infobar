@@ -60,7 +60,6 @@ static const CGFloat kMargin = 4;
 
 	[self createWindow];
 	[_bar applyPrefs:_prefs];
-	[self updateTouchThrough];
 	dispatch_async(_queue, ^{ [[IBStats sharedInstance] refresh]; });
 	[self updateVisibility];
 	[self tick];
@@ -92,7 +91,6 @@ static const CGFloat kMargin = 4;
 	_viewController.layoutHandler = ^{ [weakSelf containerDidLayout]; };
 	_window.rootViewController = _viewController;
 
-	_window.doubleTapHandler = ^{ [weakSelf windowDidDoubleTap]; };
 
 	_bar = [[IBBarView alloc] initWithFrame:CGRectZero];
 	_bar.delegate = self;
@@ -157,19 +155,10 @@ static const CGFloat kMargin = 4;
 
 #pragma mark Preferences & visibility
 
-- (void)updateTouchThrough {
-	_window.touchThrough = _prefs.pinned && _prefs.clickThrough;
-}
-
-- (void)windowDidDoubleTap {
-	if (_prefs.doubleTapTogglesLayout && _window.touchThrough) [self barViewDidDoubleTap:_bar];
-}
-
 - (void)reloadPrefs {
 	double oldInterval = _prefs.updateInterval;
 	_prefs = [IBPrefs load];
 	[_bar applyPrefs:_prefs];
-	[self updateTouchThrough];
 	if (_timer && fabs(oldInterval - _prefs.updateInterval) > 0.01) {
 		[_timer invalidate];
 		_timer = nil;
@@ -272,7 +261,6 @@ static const CGFloat kMargin = 4;
 - (void)barViewDidTogglePin:(IBBarView *)bar {
 	[IBPrefs setValue:@(bar.pinned) forKey:@"pinned"];
 	_prefs = [IBPrefs load];
-	[self updateTouchThrough];
 }
 
 - (void)barViewDidFinishDragging:(IBBarView *)bar {
