@@ -10,6 +10,7 @@ typedef NS_ENUM(NSInteger, IBGraphUnit) {
 };
 
 @interface IBShadowLabel : UILabel
+@property (nonatomic, copy, nullable) NSAttributedString *outlineText;
 - (CGSize)fittingTextSizeForWidth:(CGFloat)width;
 - (void)setTextFrame:(CGRect)frame;
 @end
