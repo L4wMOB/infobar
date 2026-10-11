@@ -3,6 +3,13 @@
 #import <QuartzCore/QuartzCore.h>
 
 static const CGFloat kLabelPad = 4;
+static const CGFloat kBoxRadius = 3;
+
+static UIColor *IBVivid(UIColor *c) {
+	CGFloat h, sat, br, a;
+	if (![c getHue:&h saturation:&sat brightness:&br alpha:&a]) return c;
+	return [UIColor colorWithHue:h saturation:MIN(1.0, sat * 1.12) brightness:MIN(1.0, br * 1.08 + 0.06) alpha:a];
+}
 
 static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	switch (unit) {
@@ -29,8 +36,24 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	self.frame = CGRectInset(frame, -kLabelPad, -kLabelPad);
 }
 
+- (void)setOutlineText:(NSAttributedString *)outlineText {
+	if (_outlineText == outlineText) return;
+	_outlineText = [outlineText copy];
+	[self setNeedsDisplay];
+}
+
 - (void)drawTextInRect:(CGRect)rect {
-	[super drawTextInRect:UIEdgeInsetsInsetRect(rect, UIEdgeInsetsMake(kLabelPad, kLabelPad, kLabelPad, kLabelPad))];
+	CGRect inner = UIEdgeInsetsInsetRect(rect, UIEdgeInsetsMake(kLabelPad, kLabelPad, kLabelPad, kLabelPad));
+	NSAttributedString *fill = self.attributedText;
+	if (_outlineText.length == 0 || fill.length == 0) {
+		[super drawTextInRect:inner];
+		return;
+	}
+	NSStringDrawingOptions options = NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading;
+	CGFloat height = ceil([fill boundingRectWithSize:inner.size options:options context:nil].size.height);
+	CGRect target = CGRectMake(inner.origin.x, inner.origin.y + MAX(0, (inner.size.height - height) / 2), inner.size.width, height);
+	[_outlineText drawWithRect:target options:options context:nil];
+	[fill drawWithRect:target options:options context:nil];
 }
 
 @end
@@ -41,10 +64,12 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 @interface IBGraphView ()
 - (void)drawPlotInContext:(CGContextRef)ctx;
+- (void)drawGridInContext:(CGContextRef)ctx;
 @end
 
 @interface IBGraphPlot : UIView
 @property (nonatomic, weak) IBGraphView *owner;
+@property (nonatomic) BOOL isGrid;
 @end
 
 @implementation IBGraphPlot
@@ -60,7 +85,8 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 }
 
 - (void)drawRect:(CGRect)rect {
-	[self.owner drawPlotInContext:UIGraphicsGetCurrentContext()];
+	if (self.isGrid) [self.owner drawGridInContext:UIGraphicsGetCurrentContext()];
+	else [self.owner drawPlotInContext:UIGraphicsGetCurrentContext()];
 }
 
 @end
@@ -69,6 +95,9 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 @implementation IBGraphView {
 	IBGraphPlot *_plot;
+	IBGraphPlot *_grid;
+	UIView *_clipView;
+	CALayer *_boxShadow;
 	UIView *_frameView;
 	IBShadowLabel *_maxLabel, *_minLabel, *_curLabel;
 	CADisplayLink *_link;
@@ -82,7 +111,7 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	if ((self = [super initWithFrame:frame])) {
 		self.backgroundColor = [UIColor clearColor];
 		self.opaque = NO;
-		self.clipsToBounds = YES;
+		self.clipsToBounds = NO;
 		self.userInteractionEnabled = NO;
 		self.contentMode = UIViewContentModeRedraw;
 		_series = @[];
@@ -97,19 +126,46 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 		_scrollDuration = 1;
 		_shadowStrength = 0.9;
 
+		_boxShadow = [CALayer layer];
+		_boxShadow.shadowColor = [UIColor blackColor].CGColor;
+		_boxShadow.shadowOffset = CGSizeMake(0, 1.5);
+		_boxShadow.shadowRadius = 4;
+		_boxShadow.shouldRasterize = YES;
+		_boxShadow.rasterizationScale = UIScreen.mainScreen.scale;
+		CAShapeLayer *boxMask = [CAShapeLayer layer];
+		boxMask.fillColor = [UIColor blackColor].CGColor;
+		boxMask.fillRule = kCAFillRuleEvenOdd;
+		_boxShadow.mask = boxMask;
+		[self.layer insertSublayer:_boxShadow atIndex:0];
+
+		_clipView = [UIView new];
+		_clipView.userInteractionEnabled = NO;
+		_clipView.clipsToBounds = YES;
+		_clipView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.42];
+		_clipView.layer.cornerRadius = kBoxRadius;
+		_clipView.layer.cornerCurve = kCACornerCurveContinuous;
+		[self addSubview:_clipView];
+
+		_grid = [[IBGraphPlot alloc] initWithFrame:CGRectZero];
+		_grid.owner = self;
+		_grid.isGrid = YES;
+		[_clipView addSubview:_grid];
+
 		_plot = [[IBGraphPlot alloc] initWithFrame:CGRectZero];
 		_plot.owner = self;
-		[self addSubview:_plot];
+		[_clipView addSubview:_plot];
 
 		_frameView = [UIView new];
 		_frameView.userInteractionEnabled = NO;
+		_frameView.layer.cornerRadius = kBoxRadius;
+		_frameView.layer.cornerCurve = kCACornerCurveContinuous;
 		_frameView.layer.borderWidth = 0.5;
-		_frameView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
+		_frameView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.5].CGColor;
 		_frameView.layer.shadowColor = [UIColor blackColor].CGColor;
 		_frameView.layer.shadowOffset = CGSizeMake(0, 0.5);
 		_frameView.layer.shadowRadius = 1.5;
 		_frameView.layer.shadowOpacity = MIN(1.0, _shadowStrength);
-		[self addSubview:_frameView];
+		[_clipView addSubview:_frameView];
 
 		_maxLabel = [self makeNumberLabel];
 		_minLabel = [self makeNumberLabel];
@@ -153,8 +209,10 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	if (fabs(shadowStrength - _shadowStrength) < 0.001) return;
 	_shadowStrength = shadowStrength;
 	_frameView.layer.shadowOpacity = MIN(1.0, MAX(0, _shadowStrength));
-	[self setNeedsDisplay];
+	[_grid setNeedsDisplay];
 	[_plot setNeedsDisplay];
+	[self setNeedsLayout];
+	_laidOutSize = CGSizeZero;
 }
 
 - (void)setSeries:(NSArray<NSArray<NSNumber *> *> *)series {
@@ -288,16 +346,41 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	[self setText:IBGraphFormat(_unit, first.lastObject.doubleValue * _valueScale + _valueOffset) onLabel:_curLabel];
 }
 
+- (void)updateBoxShadow {
+	CGRect b = self.bounds;
+	BOOL enabled = _shadowStrength > 0.01 && b.size.width > 1 && b.size.height > 1;
+	_boxShadow.hidden = !enabled;
+	if (!enabled) return;
+	const CGFloat pad = 24;
+	CGFloat w = b.size.width, h = b.size.height;
+	BOOL first = CGRectIsEmpty(_boxShadow.bounds);
+	[CATransaction begin];
+	if (first) [CATransaction setDisableActions:YES];
+	_boxShadow.bounds = CGRectMake(0, 0, w, h);
+	_boxShadow.position = CGPointMake(CGRectGetMidX(b), CGRectGetMidY(b));
+	_boxShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.85;
+	_boxShadow.shadowPath = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, w, h) cornerRadius:kBoxRadius].CGPath;
+	CAShapeLayer *mask = (CAShapeLayer *)_boxShadow.mask;
+	mask.frame = CGRectMake(-pad, -pad, w + 2 * pad, h + 2 * pad);
+	UIBezierPath *path = [UIBezierPath bezierPathWithRect:CGRectMake(0, 0, w + 2 * pad, h + 2 * pad)];
+	[path appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(pad, pad, w, h) cornerRadius:kBoxRadius]];
+	mask.path = path.CGPath;
+	[CATransaction commit];
+}
+
 - (void)layoutSubviews {
 	[super layoutSubviews];
 	CGFloat W = self.bounds.size.width, H = self.bounds.size.height;
 	CGFloat step = W / (IB_HISTORY_COUNT - 1);
 	CGFloat margin = step + 3;
+	_clipView.frame = self.bounds;
+	_grid.frame = _clipView.bounds;
 	_plot.frame = CGRectMake(-margin, 0, W + 2 * margin, H);
-	_frameView.frame = self.bounds;
+	_frameView.frame = _clipView.bounds;
 	if (!CGSizeEqualToSize(_laidOutSize, self.bounds.size)) {
 		_laidOutSize = self.bounds.size;
-		CGPathRef rectPath = CGPathCreateWithRect(CGRectInset(self.bounds, 0.25, 0.25), NULL);
+		[self updateBoxShadow];
+		CGPathRef rectPath = CGPathCreateWithRoundedRect(CGRectInset(self.bounds, 0.25, 0.25), kBoxRadius, kBoxRadius, NULL);
 		CGPathRef ring = CGPathCreateCopyByStrokingPath(rectPath, NULL, 0.5, kCGLineCapButt, kCGLineJoinMiter, 10);
 		_frameView.layer.shadowPath = ring;
 		CGPathRelease(ring);
@@ -351,14 +434,13 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 #pragma mark Drawing
 
-- (void)drawRect:(CGRect)rect {
+- (void)drawGridInContext:(CGContextRef)ctx {
 	CGRect b = self.bounds;
 	if (b.size.width < 4 || b.size.height < 4) return;
-	CGContextRef ctx = UIGraphicsGetCurrentContext();
 	CGFloat W = b.size.width, H = b.size.height;
 	CGFloat step = W / (IB_HISTORY_COUNT - 1);
 	CGContextSetLineWidth(ctx, 0.5);
-	CGContextSetStrokeColorWithColor(ctx, [UIColor colorWithWhite:1 alpha:0.13].CGColor);
+	CGContextSetStrokeColorWithColor(ctx, [UIColor colorWithWhite:1 alpha:0.28].CGColor);
 	if (_shadowStrength > 0.01)
 		CGContextSetShadowWithColor(ctx, CGSizeMake(0, 0.5), 1, [UIColor colorWithWhite:0 alpha:MIN(1.0, _shadowStrength)].CGColor);
 	for (int i = 1; i < 4; i++) {
@@ -417,9 +499,9 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 			}
 			[line addLineToPoint:CGPointMake(endX, lastY)];
 			line.lineJoinStyle = kCGLineJoinRound;
-			line.lineWidth = seriesIndex == 0 ? 1.3 : 1.0;
+			line.lineWidth = seriesIndex == 0 ? 1.6 : 1.2;
 
-			UIColor *plain = seriesIndex < _colors.count ? _colors[seriesIndex] : [UIColor whiteColor];
+			UIColor *plain = IBVivid(seriesIndex < _colors.count ? _colors[seriesIndex] : [UIColor whiteColor]);
 			if (seriesIndex == 0) {
 				UIBezierPath *fill = [line copy];
 				[fill addLineToPoint:CGPointMake(endX, H + 2)];
@@ -447,14 +529,14 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 						if (rects[k].size.height <= 0) continue;
 						CGContextSaveGState(ctx);
 						CGContextClipToRect(ctx, rects[k]);
-						[[_bandColors[k] colorWithAlphaComponent:0.30] setFill];
+						[[_bandColors[k] colorWithAlphaComponent:0.42] setFill];
 						[fill fill];
-						[_bandColors[k] setStroke];
+						[IBVivid(_bandColors[k]) setStroke];
 						strokeWithShadow(line);
 						CGContextRestoreGState(ctx);
 					}
 				} else {
-					[[plain colorWithAlphaComponent:0.25] setFill];
+					[[plain colorWithAlphaComponent:0.38] setFill];
 					[fill fill];
 					[plain setStroke];
 					strokeWithShadow(line);
@@ -468,14 +550,14 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	}
 
 	if (banded && _thresholdColors.count == 2) {
-		CGContextSetLineWidth(ctx, 0.5);
+		CGContextSetLineWidth(ctx, 0.75);
 		for (int k = 0; k < 2; k++) {
 			double t = _bandThresholds[k].doubleValue;
 			if (t <= lo || t >= hi) continue; // outside the visible range
 			CGFloat y = round(yFor(t) * 2) / 2 + 0.25;
 			CGContextSaveGState(ctx);
 			CGContextSetShadowWithColor(ctx, CGSizeMake(0, 1), 1.5, shadowColor.CGColor);
-			CGContextSetStrokeColorWithColor(ctx, [_thresholdColors[k] colorWithAlphaComponent:0.8].CGColor);
+			CGContextSetStrokeColorWithColor(ctx, IBVivid(_thresholdColors[k]).CGColor);
 			CGContextMoveToPoint(ctx, -M, y);
 			CGContextAddLineToPoint(ctx, W + M, y);
 			CGContextStrokePath(ctx);
