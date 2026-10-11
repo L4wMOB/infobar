@@ -60,7 +60,6 @@ static UIColor *IBColorNamed(NSString *name) {
 		_showPinButton = IBBool(d, @"showPinButton", YES);
 		_showOnLockScreen = IBBool(d, @"showOnLockScreen", YES);
 		_hideInLandscape = IBBool(d, @"hideInLandscape", NO);
-		_clickThrough = IBBool(d, @"clickThrough", YES);
 		_doubleTapTogglesLayout = IBBool(d, @"doubleTapTogglesLayout", YES);
 		_collapsed = IBBool(d, @"collapsed", NO);
 		_showCollapseButton = IBBool(d, @"showCollapseButton", YES);
@@ -92,6 +91,8 @@ static UIColor *IBColorNamed(NSString *name) {
 		_graphHeight = IBDouble(d, @"graphHeight", 22, 12, 60);
 		_graphWidth = IBDouble(d, @"graphWidth", 60, 30, 140);
 		_shadowStrength = IBDouble(d, @"shadowStrength", 0.9, 0, 1);
+		_outlineEnabled = IBBool(d, @"outlineEnabled", NO);
+		_outlineColorMode = (NSInteger)IBDouble(d, @"outlineColorMode", 0, 0, 2);
 
 		_showTime = IBBool(d, @"showTime", NO);
 		_showCPU = IBBool(d, @"showCPU", YES);
