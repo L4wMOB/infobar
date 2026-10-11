@@ -8,6 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *configKey;
 @property (nonatomic, copy) NSString *identifier;
 @property (nonatomic, copy) NSAttributedString *text;
+@property (nonatomic, copy, nullable) NSAttributedString *outlineText;
 @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> *graphSeries;
 @property (nonatomic, copy) NSArray<UIColor *> *graphColors;
 @property (nonatomic, copy) NSArray<UIColor *> *graphBandColors;
