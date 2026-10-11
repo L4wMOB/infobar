@@ -28,7 +28,6 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) BOOL showOnLockScreen;
 @property (nonatomic, readonly) BOOL hideInLandscape;
 @property (nonatomic, readonly) BOOL doubleTapTogglesLayout;
-@property (nonatomic, readonly) BOOL clickThrough;
 @property (nonatomic, readonly) BOOL collapsed;
 @property (nonatomic, readonly) BOOL showCollapseButton;
 @property (nonatomic, readonly) IBCollapsedMode collapsedMode;
@@ -59,6 +58,8 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) double graphHeight;
 @property (nonatomic, readonly) double graphWidth;
 @property (nonatomic, readonly) double shadowStrength;
+@property (nonatomic, readonly) BOOL outlineEnabled;
+@property (nonatomic, readonly) NSInteger outlineColorMode;
 
 // Modules
 @property (nonatomic, readonly) BOOL showTime;
