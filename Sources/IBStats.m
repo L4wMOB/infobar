@@ -199,6 +199,7 @@ static double IBEstimateCurrentCoreMHz(void) {
 	// Network
 	uint64_t _prevIn, _prevOut;
 	uint64_t _prevNetTime;
+	uint64_t _lastBatteryTime;
 	// Storage (refreshed rarely)
 	uint64_t _lastStorageTime;
 	uint64_t _lastIPTime;
@@ -228,6 +229,7 @@ static double IBEstimateCurrentCoreMHz(void) {
 		_netDownBytesPerSec = -1;
 		_netUpBytesPerSec = -1;
 
+		_measureCPU = _measureMemory = _measureBattery = _measureNetwork = _measureSystem = YES;
 		_history = [NSMutableArray array];
 		for (NSInteger i = 0; i < IBSeriesCount; i++) [_history addObject:[NSMutableArray arrayWithCapacity:IB_HISTORY_COUNT + 1]];
 
@@ -258,12 +260,13 @@ static double IBEstimateCurrentCoreMHz(void) {
 
 - (void)refresh {
 	@autoreleasepool {
-		[self refreshCPUUsage];
+		if (_measureCPU) [self refreshCPUUsage];
 		if (self.measureCPUFrequency) [self refreshCPUFrequency];
-		[self refreshMemory];
-		[self refreshBattery];
-		[self refreshNetwork];
-		[self refreshSystem];
+		if (_measureMemory) [self refreshMemory];
+		if (_measureBattery) [self refreshBattery];
+		if (_measureNetwork) [self refreshNetwork];
+		else _prevNetTime = 0; // the speed is measured from scratch when it is switched on again
+		if (_measureSystem) [self refreshSystem];
 		[self recordHistory];
 	}
 }
@@ -281,12 +284,13 @@ static double IBEstimateCurrentCoreMHz(void) {
 		[a addObject:@(v)];
 		if (a.count > IB_HISTORY_COUNT) [a removeObjectsInRange:NSMakeRange(0, a.count - IB_HISTORY_COUNT)];
 	};
-	if (_cpuUsage >= 0) push(IBSeriesCPU, _cpuUsage);
-	if (_ramUsagePercent >= 0) push(IBSeriesRAM, _ramUsagePercent);
-	if (_batteryPercent >= 0) push(IBSeriesCharge, _batteryPercent);
-	if (_batteryTemperature > -100) push(IBSeriesTemp, _batteryTemperature);
-	if (_batteryCycles >= 0) push(IBSeriesCycles, (double)_batteryCycles);
-	if (_netDownBytesPerSec >= 0 && _netUpBytesPerSec >= 0) {
+	// Only what was measured this time (no stale values)
+	if (_measureCPU && _cpuUsage >= 0) push(IBSeriesCPU, _cpuUsage);
+	if (_measureMemory && _ramUsagePercent >= 0) push(IBSeriesRAM, _ramUsagePercent);
+	if (_measureBattery && _batteryPercent >= 0) push(IBSeriesCharge, _batteryPercent);
+	if (_measureBattery && _batteryTemperature > -100) push(IBSeriesTemp, _batteryTemperature);
+	if (_measureBattery && _batteryCycles >= 0) push(IBSeriesCycles, (double)_batteryCycles);
+	if (_measureNetwork && _netDownBytesPerSec >= 0 && _netUpBytesPerSec >= 0) {
 		push(IBSeriesNetDown, _netDownBytesPerSec);
 		push(IBSeriesNetUp, _netUpBytesPerSec);
 	}
@@ -442,6 +446,9 @@ static double IBClusterFrequency(CFDictionaryRef channel, NSArray<NSNumber *> *t
 #pragma mark Battery
 
 - (void)refreshBattery {
+	uint64_t nowTime = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+	if (!_measureBatteryLive && _batteryPercent >= 0 && _lastBatteryTime > 0 && nowTime - _lastBatteryTime < 5ull * NSEC_PER_SEC) return;
+	_lastBatteryTime = nowTime;
 	if (!_battery) _battery = IOServiceGetMatchingService(MACH_PORT_NULL, IOServiceMatching("AppleSmartBattery"));
 	CFMutableDictionaryRef props = NULL;
 	if (_battery && IORegistryEntryCreateCFProperties(_battery, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS && props) {
