@@ -54,6 +54,9 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 #pragma mark - Bar
 
 @implementation IBBarView {
+	UIView *_bgClip;
+	CALayer *_bgShadow;
+	BOOL _hasPanel;
 	UIVisualEffectView *_blurView;
 	UIView *_tintView;
 	UIButton *_pinButton;
@@ -85,7 +88,7 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
-		self.clipsToBounds = YES;
+		self.clipsToBounds = NO; // the panel is clipped by _bgClip so its drop shadow can show
 		self.layer.cornerCurve = kCACornerCurveContinuous;
 
 		_cells = [NSMutableArray array];
@@ -101,16 +104,34 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 		_stickyShapes = [NSMutableDictionary dictionary];
 		_moduleSignature = @"";
 
+		_bgShadow = [CALayer layer];
+		_bgShadow.shadowColor = [UIColor blackColor].CGColor;
+		_bgShadow.shadowOffset = CGSizeMake(0, 2);
+		_bgShadow.shadowRadius = 8;
+		_bgShadow.shouldRasterize = YES;
+		_bgShadow.rasterizationScale = UIScreen.mainScreen.scale;
+		CAShapeLayer *shadowMask = [CAShapeLayer layer];
+		shadowMask.fillColor = [UIColor blackColor].CGColor;
+		shadowMask.fillRule = kCAFillRuleEvenOdd;
+		_bgShadow.mask = shadowMask;
+		[self.layer insertSublayer:_bgShadow atIndex:0];
+
+		_bgClip = [UIView new];
+		_bgClip.clipsToBounds = YES;
+		_bgClip.layer.cornerCurve = kCACornerCurveContinuous;
+		_bgClip.userInteractionEnabled = NO;
+		[self addSubview:_bgClip];
+
 		_blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
 		_blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		_blurView.userInteractionEnabled = NO;
-		[self addSubview:_blurView];
+		[_bgClip addSubview:_blurView];
 
 		_tintView = [UIView new];
 		_tintView.backgroundColor = [UIColor blackColor];
 		_tintView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		_tintView.userInteractionEnabled = NO;
-		[self addSubview:_tintView];
+		[_bgClip addSubview:_tintView];
 
 		_pinButton = [UIButton buttonWithType:UIButtonTypeCustom];
 		[_pinButton addTarget:self action:@selector(pinTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -172,11 +193,13 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 	_extraTop = prefs.bgExtendTop;
 	_extraBottom = prefs.bgExtendBottom;
 
+	_hasPanel = prefs.backgroundAlpha > 0.02;
 	BOOL blur = prefs.useBlur && prefs.backgroundAlpha > 0.02;
 	_blurView.hidden = !blur;
 	// With blur, a lighter tint gives the same perceived opacity
 	_tintView.alpha = blur ? prefs.backgroundAlpha * 0.6 : prefs.backgroundAlpha;
 	self.layer.cornerRadius = prefs.cornerRadius;
+	_bgClip.layer.cornerRadius = prefs.cornerRadius;
 	self.pinned = prefs.pinned;
 	[self setNeedsLayout];
 }
@@ -419,11 +442,35 @@ static CGFloat IBTopGap(IBModule *m) {
 	return [self computeLayoutForMaxWidth:maxWidth];
 }
 
+- (void)updateBackgroundShadow {
+	CGRect b = self.bounds;
+	BOOL enabled = _hasPanel && _shadowStrength > 0.01 && b.size.width > 1 && b.size.height > 1;
+	_bgShadow.hidden = !enabled;
+	if (!enabled) return;
+	const CGFloat pad = 40;
+	CGFloat w = b.size.width, h = b.size.height, r = _bgClip.layer.cornerRadius;
+	BOOL first = CGRectIsEmpty(_bgShadow.bounds);
+	[CATransaction begin];
+	if (first) [CATransaction setDisableActions:YES];
+	_bgShadow.bounds = CGRectMake(0, 0, w, h);
+	_bgShadow.position = CGPointMake(CGRectGetMidX(b), CGRectGetMidY(b));
+	_bgShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.6;
+	_bgShadow.shadowPath = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, w, h) cornerRadius:r].CGPath;
+	CAShapeLayer *mask = (CAShapeLayer *)_bgShadow.mask;
+	mask.frame = CGRectMake(-pad, -pad, w + 2 * pad, h + 2 * pad);
+	UIBezierPath *path = [UIBezierPath bezierPathWithRect:CGRectMake(0, 0, w + 2 * pad, h + 2 * pad)];
+	[path appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(pad, pad, w, h) cornerRadius:r]];
+	mask.path = path.CGPath;
+	[CATransaction commit];
+}
+
 - (void)layoutSubviews {
 	[super layoutSubviews];
 	CGRect b = self.bounds;
-	_blurView.frame = b;
-	_tintView.frame = b;
+	_bgClip.frame = b;
+	_blurView.frame = _bgClip.bounds;
+	_tintView.frame = _bgClip.bounds;
+	[self updateBackgroundShadow];
 
 	if (_cellFrames.count != _modules.count) [self computeLayoutForMaxWidth:b.size.width];
 
