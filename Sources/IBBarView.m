@@ -12,6 +12,17 @@ static const CGFloat kLineGapRow = 4;
 static const CGFloat kGraphGapBelow = 2;
 static const CGFloat kMinGraphWidth = 44;
 
+static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat strength) {
+	if (!text || text.length == 0 || strength <= 0.01) return text;
+	NSShadow *shadow = [NSShadow new];
+	shadow.shadowColor = [UIColor colorWithWhite:0 alpha:MIN(1.0, strength)];
+	shadow.shadowOffset = CGSizeMake(0, 0.6);
+	shadow.shadowBlurRadius = 1.6;
+	NSMutableAttributedString *m = [text mutableCopy];
+	[m addAttribute:NSShadowAttributeName value:shadow range:NSMakeRange(0, m.length)];
+	return m;
+}
+
 #pragma mark - Cell (one module: text + optional graph)
 
 @interface IBCellView : UIView
@@ -149,6 +160,12 @@ static const CGFloat kMinGraphWidth = 44;
 	_doubleTap.enabled = prefs.doubleTapTogglesLayout;
 
 	_shadowStrength = prefs.shadowStrength;
+	for (UIButton *b in @[_pinButton, _collapseButton]) {
+		b.layer.shadowColor = [UIColor blackColor].CGColor;
+		b.layer.shadowOffset = CGSizeMake(0, 0.6);
+		b.layer.shadowRadius = 1.5;
+		b.layer.shadowOpacity = MIN(1.0, MAX(0, _shadowStrength));
+	}
 	_updateInterval = prefs.updateInterval;
 	_graphHeight = prefs.graphHeight;
 	_graphWidth = prefs.graphWidth;
@@ -223,7 +240,7 @@ static const CGFloat kMinGraphWidth = 44;
 			cell.hidden = NO;
 			cell.alpha = 0;
 			cell.justShown = YES;
-			cell.label.attributedText = m.text;
+			cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
 			[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
 		} else {
 			if (cell.alpha < 1) [UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
@@ -233,9 +250,9 @@ static const CGFloat kMinGraphWidth = 44;
 				t.duration = dissolve;
 				t.preferredFrameRateRange = CAFrameRateRangeMake(15, 30, 30);
 				[cell.label.layer addAnimation:t forKey:@"fade"];
-				cell.label.attributedText = m.text;
+				cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
 			} else {
-				cell.label.attributedText = m.text;
+				cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
 			}
 		}
 
