@@ -12,6 +12,7 @@ static const CGFloat kLineGapRow = 4;
 static const CGFloat kGraphGapBelow = 2;
 static const CGFloat kMinGraphWidth = 44;
 
+// Makes sure text and inline icons always carry the shadow, whatever the formatter produced
 static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat strength) {
 	if (!text || text.length == 0 || strength <= 0.01) return text;
 	NSShadow *shadow = [NSShadow new];
@@ -21,6 +22,11 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 	NSMutableAttributedString *m = [text mutableCopy];
 	[m addAttribute:NSShadowAttributeName value:shadow range:NSMakeRange(0, m.length)];
 	return m;
+}
+
+static void IBApplyLabel(IBShadowLabel *label, IBModule *m, CGFloat strength) {
+	label.outlineText = m.outlineText;
+	label.attributedText = m.outlineText ? m.text : IBApplyShadow(m.text, strength);
 }
 
 #pragma mark - Cell (one module: text + optional graph)
@@ -263,7 +269,7 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 			cell.hidden = NO;
 			cell.alpha = 0;
 			cell.justShown = YES;
-			cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
+			IBApplyLabel(cell.label, m, _shadowStrength);
 			[UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
 		} else {
 			if (cell.alpha < 1) [UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{ cell.alpha = 1; } completion:nil];
@@ -273,9 +279,9 @@ static NSAttributedString *IBApplyShadow(NSAttributedString *text, CGFloat stren
 				t.duration = dissolve;
 				t.preferredFrameRateRange = CAFrameRateRangeMake(15, 30, 30);
 				[cell.label.layer addAnimation:t forKey:@"fade"];
-				cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
+				IBApplyLabel(cell.label, m, _shadowStrength);
 			} else {
-				cell.label.attributedText = IBApplyShadow(m.text, _shadowStrength);
+				IBApplyLabel(cell.label, m, _shadowStrength);
 			}
 		}
 
@@ -442,6 +448,8 @@ static CGFloat IBTopGap(IBModule *m) {
 	return [self computeLayoutForMaxWidth:maxWidth];
 }
 
+// Soft drop shadow behind the panel. The area under the panel is masked out so the
+// shadow never darkens the blur, only the outside edge.
 - (void)updateBackgroundShadow {
 	CGRect b = self.bounds;
 	BOOL enabled = _hasPanel && _shadowStrength > 0.01 && b.size.width > 1 && b.size.height > 1;
