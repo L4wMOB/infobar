@@ -80,4 +80,4 @@
 "Graphs are updated in real time and always sit right below their value. The line changes color by level (low / medium / high) when \"Color-coded values (green/yellow/red)\" is on." = "Graphs are updated in real time and always sit right below their value. The line changes color by level (low / medium / high) when \"Color-coded values (green/yellow/red)\" is on.";
 "Shadow" = "Shadow";
 "Soft shadow behind all text, icons and graphs. 0 turns it off." = "Soft shadow behind all text, icons and graphs. 0 turns it off.";
-"Click-through (move bar with its buttons)" = "Click-through (move bar with its buttons)";
+"Click-through when pinned" = "Click-through when pinned";
