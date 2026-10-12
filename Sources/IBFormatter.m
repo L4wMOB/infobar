@@ -39,13 +39,6 @@ static UIColor *IBPickDistinct(NSArray<UIColor *> *candidates, NSArray<UIColor *
 	return candidates.lastObject;
 }
 
-static UIColor *IBOutlineColor(IBPrefs *p, UIColor *itemColor, UIColor *base) {
-	if (p.outlineColorMode == 2) return [UIColor whiteColor];
-	if (p.outlineColorMode == 1) return [UIColor blackColor];
-	if (itemColor && IBColorDistance(itemColor, base) > 0.08) return itemColor;
-	return [UIColor blackColor];
-}
-
 static NSString *IBPct(double v) {
 	if (v < 0) return @"–";
 	NSString *s = [NSString stringWithFormat:@"%.0f%%", v];
@@ -120,11 +113,11 @@ static NSString *IBDuration(NSTimeInterval t) {
 
 @implementation IBFormatter
 
-+ (UIImage *)symbolNamed:(NSArray<NSString *> *)names size:(CGFloat)size color:(UIColor *)color outline:(UIColor *)outline {
++ (UIImage *)symbolNamed:(NSArray<NSString *> *)names size:(CGFloat)size color:(UIColor *)color outline:(UIColor *)outline width:(CGFloat)outlineWidth {
 	static NSCache *cache;
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{ cache = [NSCache new]; });
-	NSString *key = [NSString stringWithFormat:@"%@|%.1f|%@|%@", names.firstObject, size, color, outline];
+	NSString *key = [NSString stringWithFormat:@"%@|%.1f|%@|%@|%.2f", names.firstObject, size, color, outline, outlineWidth];
 	UIImage *cached = [cache objectForKey:key];
 	if (cached) return cached;
 
@@ -135,7 +128,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			UIImage *fillImage = [img imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
 			if (outline) {
 				UIImage *edgeImage = [img imageWithTintColor:outline renderingMode:UIImageRenderingModeAlwaysOriginal];
-				CGFloat w = 0.9, pad = 1;
+				CGFloat w = outlineWidth / 2, pad = ceil(w);
 				CGSize sz = img.size;
 				UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
 				UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(sz.width + 2 * pad, sz.height + 2 * pad) format:format];
@@ -410,7 +403,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 	[cfg appendString:p.showCyclesGraph ? @"1" : @"0"];
 	[cfg appendString:p.showNetworkGraph ? @"1" : @"0"];
 	[cfg appendFormat:@"%ld%ld", (long)p.layout, (long)p.collapsedMode];
-	[cfg appendFormat:@"o%d%ld", p.outlineEnabled, (long)p.outlineColorMode];
+	[cfg appendFormat:@"o%d", p.outlineEnabled];
 
 	NSDictionary *labelAttrs = @{NSFontAttributeName: font, NSForegroundColorAttributeName: [base colorWithAlphaComponent:0.85]};
 	NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
@@ -426,12 +419,8 @@ static NSString *IBDuration(NSTimeInterval t) {
 	for (IBItem *item in items) {
 		NSMutableAttributedString *line = [NSMutableAttributedString new];
 		BOOL textless = item.graphOnly;
-		UIColor *outlineColor = nil;
-		if (p.outlineEnabled) {
-			UIColor *itemColor = item.value.length > 0 ? [item.value attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:nil] : nil;
-			outlineColor = IBOutlineColor(p, itemColor, base);
-		}
-		UIImage *icon = (p.useIcons && !textless) ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base outline:outlineColor] : nil;
+		UIColor *outlineColor = p.outlineEnabled ? [UIColor blackColor] : nil;
+		UIImage *icon = (p.useIcons && !textless) ? [self symbolNamed:item.symbols size:p.fontSize * 0.9 color:base outline:outlineColor width:p.outlineWidth] : nil;
 		if (icon) {
 			NSTextAttachment *att = [NSTextAttachment new];
 			att.image = icon;
@@ -460,7 +449,7 @@ static NSString *IBDuration(NSTimeInterval t) {
 			NSMutableAttributedString *edge = [line mutableCopy];
 			NSRange all = NSMakeRange(0, edge.length);
 			[edge addAttribute:NSStrokeColorAttributeName value:outlineColor range:all];
-			[edge addAttribute:NSStrokeWidthAttributeName value:@(1.7 / font.pointSize * 100) range:all];
+			[edge addAttribute:NSStrokeWidthAttributeName value:@(p.outlineWidth / font.pointSize * 100) range:all];
 			if (textShadow) [edge addAttribute:NSShadowAttributeName value:textShadow range:all];
 			outlineText = edge;
 		} else if (line.length > 0 && textShadow) {
