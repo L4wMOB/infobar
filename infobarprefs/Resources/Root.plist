@@ -164,7 +164,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Summary shows the values selected below, in this order. Ã¢ÂÂButtons onlyÃ¢ÂÂ keeps just the pin and the arrow.</string>
+			<string>Summary shows the values selected below, in this order. “Buttons only” keeps just the pin and the arrow.</string>
 			<key>label</key>
 			<string>When collapsed, show</string>
 		</dict>
@@ -424,34 +424,6 @@
 			<key>cell</key>
 			<string>PSLinkListCell</string>
 			<key>default</key>
-			<integer>0</integer>
-			<key>defaults</key>
-			<string>com.mathelord.infobar</string>
-			<key>detail</key>
-			<string>PSListItemsController</string>
-			<key>key</key>
-			<string>outlineColorMode</string>
-			<key>label</key>
-			<string>Outline color</string>
-			<key>validTitles</key>
-			<array>
-				<string>Item color</string>
-				<string>Black</string>
-				<string>White</string>
-			</array>
-			<key>validValues</key>
-			<array>
-				<integer>0</integer>
-				<integer>1</integer>
-				<integer>2</integer>
-			</array>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.mathelord.infobar/prefschanged</string>
-			<key>cell</key>
-			<string>PSLinkListCell</string>
-			<key>default</key>
 			<string>white</string>
 			<key>defaults</key>
 			<string>com.mathelord.infobar</string>
@@ -677,6 +649,32 @@
 			<integer>1</integer>
 			<key>min</key>
 			<integer>0</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Black outline around text and icons, in points. Only used when "Outline text &amp; icons" is on.</string>
+			<key>label</key>
+			<string>Outline thickness</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.mathelord.infobar/prefschanged</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>1.5</real>
+			<key>defaults</key>
+			<string>com.mathelord.infobar</string>
+			<key>key</key>
+			<string>outlineWidth</string>
+			<key>max</key>
+			<real>3</real>
+			<key>min</key>
+			<real>0.5</real>
 			<key>showValue</key>
 			<true/>
 		</dict>
