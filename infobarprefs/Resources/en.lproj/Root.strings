@@ -81,6 +81,5 @@
 "Shadow" = "Shadow";
 "Soft shadow behind all text, icons and graphs. 0 turns it off." = "Soft shadow behind all text, icons and graphs. 0 turns it off.";
 "Outline text & icons" = "Outline text & icons";
-"Outline color" = "Outline color";
-"Item color" = "Item color";
-"Black" = "Black";
+"Outline thickness" = "Outline thickness";
+"Black outline around text and icons, in points. Only used when \"Outline text & icons\" is on." = "Black outline around text and icons, in points. Only used when \"Outline text & icons\" is on.";
