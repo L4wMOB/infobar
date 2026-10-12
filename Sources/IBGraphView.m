@@ -52,7 +52,13 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	NSStringDrawingOptions options = NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading;
 	CGFloat height = ceil([fill boundingRectWithSize:inner.size options:options context:nil].size.height);
 	CGRect target = CGRectMake(inner.origin.x, inner.origin.y + MAX(0, (inner.size.height - height) / 2), inner.size.width, height);
+	CGContextRef ctx = UIGraphicsGetCurrentContext();
+	CGContextSaveGState(ctx);
+	CGContextSetLineJoin(ctx, kCGLineJoinRound);
+	CGContextSetLineCap(ctx, kCGLineCapRound);
+	CGContextSetMiterLimit(ctx, 2);
 	[_outlineText drawWithRect:target options:options context:nil];
+	CGContextRestoreGState(ctx);
 	[fill drawWithRect:target options:options context:nil];
 }
 
@@ -98,6 +104,8 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	IBGraphPlot *_grid;
 	UIView *_clipView;
 	CALayer *_boxShadow;
+	CADisplayLink *_shadowLink;
+	CFTimeInterval _shadowLinkStart;
 	UIView *_frameView;
 	IBShadowLabel *_maxLabel, *_minLabel, *_curLabel;
 	CADisplayLink *_link;
@@ -180,7 +188,10 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 
 - (void)willMoveToWindow:(UIWindow *)newWindow {
 	[super willMoveToWindow:newWindow];
-	if (!newWindow) [self stopLink];
+	if (!newWindow) {
+		[self stopLink];
+		[self stopShadowLink];
+	}
 }
 
 #pragma mark Properties
@@ -346,19 +357,13 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	[self setText:IBGraphFormat(_unit, first.lastObject.doubleValue * _valueScale + _valueOffset) onLabel:_curLabel];
 }
 
-- (void)updateBoxShadow {
-	CGRect b = self.bounds;
-	BOOL enabled = _shadowStrength > 0.01 && b.size.width > 1 && b.size.height > 1;
-	_boxShadow.hidden = !enabled;
-	if (!enabled) return;
+- (void)applyBoxShadowSize:(CGSize)size {
 	const CGFloat pad = 24;
-	CGFloat w = b.size.width, h = b.size.height;
-	BOOL first = CGRectIsEmpty(_boxShadow.bounds);
+	CGFloat w = size.width, h = size.height;
 	[CATransaction begin];
-	if (first) [CATransaction setDisableActions:YES];
+	[CATransaction setDisableActions:YES];
 	_boxShadow.bounds = CGRectMake(0, 0, w, h);
-	_boxShadow.position = CGPointMake(CGRectGetMidX(b), CGRectGetMidY(b));
-	_boxShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.85;
+	_boxShadow.position = CGPointMake(w / 2, h / 2);
 	_boxShadow.shadowPath = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, w, h) cornerRadius:kBoxRadius].CGPath;
 	CAShapeLayer *mask = (CAShapeLayer *)_boxShadow.mask;
 	mask.frame = CGRectMake(-pad, -pad, w + 2 * pad, h + 2 * pad);
@@ -366,6 +371,51 @@ static NSString *IBGraphFormat(IBGraphUnit unit, double v) {
 	[path appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(pad, pad, w, h) cornerRadius:kBoxRadius]];
 	mask.path = path.CGPath;
 	[CATransaction commit];
+}
+
+- (void)updateBoxShadow {
+	CGSize size = self.bounds.size;
+	BOOL enabled = _shadowStrength > 0.01 && size.width > 1 && size.height > 1;
+	_boxShadow.hidden = !enabled;
+	if (!enabled) {
+		[self stopShadowLink];
+		return;
+	}
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	_boxShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.5;
+	[CATransaction commit];
+	BOOL animating = [UIView inheritedAnimationDuration] > 0 || self.layer.animationKeys.count > 0;
+	if (animating && !CGRectIsEmpty(_boxShadow.bounds)) {
+		[self startShadowLink];
+	} else if (!_shadowLink) {
+		[self applyBoxShadowSize:size];
+	}
+}
+
+- (void)startShadowLink {
+	if (_shadowLink || !self.window) return;
+	_shadowLinkStart = CACurrentMediaTime();
+	_boxShadow.shouldRasterize = NO;
+	_shadowLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(shadowTick:)];
+	_shadowLink.preferredFrameRateRange = CAFrameRateRangeMake(30, 60, 60);
+	[_shadowLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopShadowLink {
+	if (!_shadowLink) return;
+	[_shadowLink invalidate];
+	_shadowLink = nil;
+	_boxShadow.shouldRasterize = YES;
+}
+
+- (void)shadowTick:(CADisplayLink *)link {
+	CALayer *presentation = self.layer.presentationLayer;
+	[self applyBoxShadowSize:presentation ? presentation.bounds.size : self.bounds.size];
+	if (self.layer.animationKeys.count == 0 || CACurrentMediaTime() - _shadowLinkStart > 2) {
+		[self stopShadowLink];
+		[self applyBoxShadowSize:self.bounds.size];
+	}
 }
 
 - (void)layoutSubviews {
