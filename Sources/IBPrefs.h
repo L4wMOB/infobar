@@ -59,7 +59,7 @@ typedef NS_ENUM(NSInteger, IBCollapsedMode) {
 @property (nonatomic, readonly) double graphWidth;
 @property (nonatomic, readonly) double shadowStrength;
 @property (nonatomic, readonly) BOOL outlineEnabled;
-@property (nonatomic, readonly) NSInteger outlineColorMode;
+@property (nonatomic, readonly) double outlineWidth;
 
 // Modules
 @property (nonatomic, readonly) BOOL showTime;
