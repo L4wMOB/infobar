@@ -62,6 +62,8 @@ static void IBApplyLabel(IBShadowLabel *label, IBModule *m, CGFloat strength) {
 @implementation IBBarView {
 	UIView *_bgClip;
 	CALayer *_bgShadow;
+	CADisplayLink *_shadowLink;
+	CFTimeInterval _shadowLinkStart;
 	BOOL _hasPanel;
 	UIVisualEffectView *_blurView;
 	UIView *_tintView;
@@ -450,19 +452,13 @@ static CGFloat IBTopGap(IBModule *m) {
 
 // Soft drop shadow behind the panel. The area under the panel is masked out so the
 // shadow never darkens the blur, only the outside edge.
-- (void)updateBackgroundShadow {
-	CGRect b = self.bounds;
-	BOOL enabled = _hasPanel && _shadowStrength > 0.01 && b.size.width > 1 && b.size.height > 1;
-	_bgShadow.hidden = !enabled;
-	if (!enabled) return;
+- (void)applyShadowSize:(CGSize)size {
 	const CGFloat pad = 40;
-	CGFloat w = b.size.width, h = b.size.height, r = _bgClip.layer.cornerRadius;
-	BOOL first = CGRectIsEmpty(_bgShadow.bounds);
+	CGFloat w = size.width, h = size.height, r = _bgClip.layer.cornerRadius;
 	[CATransaction begin];
-	if (first) [CATransaction setDisableActions:YES];
+	[CATransaction setDisableActions:YES];
 	_bgShadow.bounds = CGRectMake(0, 0, w, h);
-	_bgShadow.position = CGPointMake(CGRectGetMidX(b), CGRectGetMidY(b));
-	_bgShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.6;
+	_bgShadow.position = CGPointMake(w / 2, h / 2);
 	_bgShadow.shadowPath = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, w, h) cornerRadius:r].CGPath;
 	CAShapeLayer *mask = (CAShapeLayer *)_bgShadow.mask;
 	mask.frame = CGRectMake(-pad, -pad, w + 2 * pad, h + 2 * pad);
@@ -470,6 +466,56 @@ static CGFloat IBTopGap(IBModule *m) {
 	[path appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(pad, pad, w, h) cornerRadius:r]];
 	mask.path = path.CGPath;
 	[CATransaction commit];
+}
+
+- (void)updateBackgroundShadow {
+	CGSize size = self.bounds.size;
+	BOOL enabled = _hasPanel && _shadowStrength > 0.01 && size.width > 1 && size.height > 1;
+	_bgShadow.hidden = !enabled;
+	if (!enabled) {
+		[self stopShadowLink];
+		return;
+	}
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	_bgShadow.shadowOpacity = MIN(1.0, _shadowStrength) * 0.6;
+	[CATransaction commit];
+	BOOL animating = [UIView inheritedAnimationDuration] > 0 || self.layer.animationKeys.count > 0;
+	if (animating && !CGRectIsEmpty(_bgShadow.bounds)) {
+		[self startShadowLink];
+	} else if (!_shadowLink) {
+		[self applyShadowSize:size];
+	}
+}
+
+- (void)startShadowLink {
+	if (_shadowLink || !self.window) return;
+	_shadowLinkStart = CACurrentMediaTime();
+	_bgShadow.shouldRasterize = NO;
+	_shadowLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(shadowTick:)];
+	_shadowLink.preferredFrameRateRange = CAFrameRateRangeMake(30, 60, 60);
+	[_shadowLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopShadowLink {
+	if (!_shadowLink) return;
+	[_shadowLink invalidate];
+	_shadowLink = nil;
+	_bgShadow.shouldRasterize = YES;
+}
+
+- (void)shadowTick:(CADisplayLink *)link {
+	CALayer *presentation = self.layer.presentationLayer;
+	[self applyShadowSize:presentation ? presentation.bounds.size : self.bounds.size];
+	if (self.layer.animationKeys.count == 0 || CACurrentMediaTime() - _shadowLinkStart > 2) {
+		[self stopShadowLink];
+		[self applyShadowSize:self.bounds.size];
+	}
+}
+
+- (void)willMoveToWindow:(UIWindow *)newWindow {
+	[super willMoveToWindow:newWindow];
+	if (!newWindow) [self stopShadowLink];
 }
 
 - (void)layoutSubviews {
